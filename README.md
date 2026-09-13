@@ -22,6 +22,7 @@ psql greektutor -f seed/harada.sql       # re-runnable: edit it to re-cut the bo
 uv venv .venv && source .venv/bin/activate      # Windows: .venv/Scripts/activate
 uv pip install -r requirements.txt
 cp .env.example .env   # fill in DATABASE_URL, ANTHROPIC_API_KEY, COOKIE_SECRET
+                       # optional: HARADA_EXPORT_PATH to mirror the board for the tracker
 
 # 3. Run
 set -a; source .env; set +a
@@ -46,24 +47,32 @@ Put it behind your Cloudflare Tunnel pointing at 127.0.0.1:8080.
 
 ## The Harada board
 
-Spec: `docs/HARADA_INTEGRATION.md`. Prototype UI: `docs/harada-board.html`.
-Cell definitions: `seed/harada.sql` (40 cells score automatically, 24 are
-manual because a text tutor cannot measure them honestly). Scoring is pure
-Python in `app/harada_metrics.py`; the contracts for each `metric_kind` are in
-its module docstring.
+Spec: `docs/HARADA_INTEGRATION.md`. The dashboard (`/`) **is** the board:
+the 9×9 mandala from `docs/harada-board.html` rendered from `GET /api/harada`,
+with the goal/cycle form, the focus list, and a detail panel per cell. Cell
+definitions: `seed/harada.sql` (40 cells score automatically, 24 are manual
+because a text tutor cannot measure them honestly). Scoring is pure Python in
+`app/harada_metrics.py`; the contracts for each `metric_kind` are in its module
+docstring.
 
 | Endpoint | Form fields | Notes |
 |---|---|---|
-| `GET /api/harada` | — | Board JSON: themes → actions with state, progress, is_focus |
-| `POST /api/harada/goal` | `goal_text`, `cycle_text`, `cycle_days` | Upsert the central goal / 90-day cycle |
+| `GET /api/harada` | — | The board payload (`docs/HARADA_BOARD_CONTRACT.md`) |
+| `POST /api/harada/goal` | `goal_text`, `cycle_text`, `cycle_days`, `restart_cycle?` | Upsert the central goal / cycle |
 | `POST /api/harada/action/{id}/focus` | `on=true\|false` | Max 5 focus cells, enforced server-side (409) |
 | `POST /api/harada/action/{id}/state` | `state=not_started\|in_progress\|done` | Manual cells only (409 otherwise) |
-| `POST /api/harada/routine` | `key`, `checked`, `log_date?` | Daily check sheet; keys are the `routine_days` metric keys |
+| `POST /api/harada/routine` | `key`, `checked`, `log_date?` | Daily check sheet write path; the sheet UI lives in the tracker |
 | `POST /api/harada/recompute` | — | Rescore now (also runs at every session close) |
 
-Until the board UI lands, drive it with fetch from the browser console or curl
-with your session cookie, e.g. `curl -b gt_session=… -d on=true
-localhost:8080/api/harada/action/12/focus`.
+### Mirror for the tracker
+
+Set `HARADA_EXPORT_PATH` and the same payload is written to that file,
+atomically, after every board change (session close, focus, manual state,
+goal). The tracker bind-mounts it read-only and mirrors the Greek board through
+`linked` cells; it never writes back. Contract, ownership split and consumer
+rules: `docs/HARADA_BOARD_CONTRACT.md`. With one learner leave
+`HARADA_EXPORT_USER_ID` empty; once a second account exists the export
+stops (logged) until you pin it to a `users.id`.
 
 ## Development
 
@@ -85,7 +94,8 @@ TEST_DATABASE_URL=postgresql://tutor:tutor@127.0.0.1:5499/greektutor_test pytest
 
 ## Not yet included (by design)
 
-- Board UI on the dashboard (next phase — see `docs/handoff-items/`)
+- Daily routine check sheet UI — deliberately lives in the tracker (habits
+  with `board_action_id`), not here; see `docs/HARADA_BOARD_CONTRACT.md`
 - Cycle close / 90-day review (Harada step 6)
 - Voice — parked until the first 90-day cycle closes
 - Email verification / password reset, rate limiting on `/login` and `/signup`

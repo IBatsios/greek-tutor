@@ -9,3 +9,8 @@ SESSION_MAX_TURNS = int(os.environ.get("SESSION_MAX_TURNS", "120"))
 COOKIE_SECRET = os.environ["COOKIE_SECRET"]
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
 SESSION_TTL_DAYS = 30
+# Board export for the tracker (docs/HARADA_BOARD_CONTRACT.md). Empty = off.
+HARADA_EXPORT_PATH = os.environ.get("HARADA_EXPORT_PATH", "")
+# Pin the export to one users.id; unset = export only while exactly one account exists.
+HARADA_EXPORT_USER_ID = int(os.environ["HARADA_EXPORT_USER_ID"]) \
+    if os.environ.get("HARADA_EXPORT_USER_ID") else None

@@ -1,0 +1,57 @@
+-- Seed: A1 lesson sequence (24 lessons ≈ 8-12 weeks at one lesson per 2-3 sessions).
+-- Objectives are what the tutor drills and what objective_progress measures.
+
+BEGIN;
+
+INSERT INTO lessons (level, seq, topic, objectives) VALUES
+('A1',  1, 'The alphabet & reading basics',
+ '["recognize all 24 letters", "read simple words aloud", "vowel combinations αι/ει/ου", "final sigma ς"]'),
+('A1',  2, 'Greetings & introductions',
+ '["γεια σου/σας, καλημέρα, καλησπέρα", "με λένε... (my name is)", "τι κάνεις; and replies", "formal vs informal you"]'),
+('A1',  3, 'The verb είμαι (to be)',
+ '["conjugate είμαι in present", "say nationality and profession", "basic sentence order"]'),
+('A1',  4, 'Numbers 1–20 & age',
+ '["count 1-20", "πόσων χρονών είσαι;", "phone numbers digit by digit"]'),
+('A1',  5, 'Gender & the definite article',
+ '["ο/η/το with common nouns", "guess gender from endings -ος/-α/-ι/-ο", "this is a/the..."]'),
+('A1',  6, 'Everyday objects & plurals',
+ '["plural forms of common nouns", "τι είναι αυτό;", "classroom and household vocab"]'),
+('A1',  7, 'The verb έχω (to have) & family',
+ '["conjugate έχω", "family member vocabulary", "possessives μου/σου/του"]'),
+('A1',  8, 'Ordering at a café',
+ '["θα ήθελα... (I would like)", "coffee/drink vocabulary", "politeness: παρακαλώ/ευχαριστώ", "the bill please"]'),
+('A1',  9, 'Regular verbs in -ω (present tense)',
+ '["conjugate μένω, κάνω, ξέρω, θέλω", "I live in / I work at", "negation with δεν"]'),
+('A1', 10, 'Days, months & telling time',
+ '["days of the week", "months and seasons", "τι ώρα είναι; on the hour and half hour"]'),
+('A1', 11, 'Food & the taverna',
+ '["common dishes and ingredients", "ordering a meal", "expressing likes: μου αρέσει / μου αρέσουν"]'),
+('A1', 12, 'Review & free conversation I',
+ '["hold a 5-minute introduction conversation", "recycle lessons 1-11 vocabulary", "self-correct final sigma and gender"]'),
+('A1', 13, 'The accusative case',
+ '["article changes τον/την/το", "direct objects with common verbs", "βλέπω τον/την..."]'),
+('A1', 14, 'Asking for directions',
+ '["πού είναι...;", "left/right/straight vocabulary", "prepositions σε/από contractions στο/στη"]'),
+('A1', 15, 'Numbers 20–1000 & shopping',
+ '["larger numbers", "πόσο κάνει;", "sizes and colors", "paying and change"]'),
+('A1', 16, 'Verbs in -άω (μιλάω, αγαπάω)',
+ '["conjugate -άω verbs", "languages: μιλάω ελληνικά/αγγλικά", "adverbs λίγο/πολύ/καλά"]'),
+('A1', 17, 'Weather & seasons small talk',
+ '["weather expressions κάνει κρύο/ζέστη", "describing today and tomorrow", "seasonal activities"]'),
+('A1', 18, 'Daily routine & reflexives',
+ '["routine verbs: ξυπνάω, τρώω, δουλεύω, κοιμάμαι", "time expressions: το πρωί/το βράδυ", "sequencing: πρώτα, μετά, τέλος"]'),
+('A1', 19, 'Making plans & the future with θα',
+ '["simple future θα + verb", "inviting: θέλεις να...;", "accepting and declining politely"]'),
+('A1', 20, 'At the hotel & travel basics',
+ '["booking a room", "travel documents vocab", "checking in/out", "problems: δεν λειτουργεί..."]'),
+('A1', 21, 'The genitive for possession',
+ '["του/της possession", "whose is this? τίνος είναι;", "family relations revisited"]'),
+('A1', 22, 'Past tense preview: είχα & ήμουν',
+ '["imperfect of είμαι and έχω", "talking about yesterday simply", "χθες/σήμερα/αύριο"]'),
+('A1', 23, 'Health & at the pharmacy',
+ '["body parts", "πονάει... (it hurts)", "asking for basic remedies"]'),
+('A1', 24, 'Review & free conversation II — A1 exit check',
+ '["10-minute mixed conversation", "narrate your day", "order, shop, and ask directions unprompted", "tutor assesses readiness for A2"]')
+ON CONFLICT (level, seq) DO NOTHING;
+
+COMMIT;

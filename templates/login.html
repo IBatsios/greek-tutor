@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Greek Tutor — Login</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    body{font-family:system-ui;max-width:24rem;margin:4rem auto;padding:0 1rem}
+    input,button{width:100%;padding:.6rem;margin:.3rem 0;font-size:1rem}
+    button{cursor:pointer}
+    .err{color:#b00}
+  </style>
+</head>
+<body>
+  <h1>Ελληνικά 🇬🇷</h1>
+  <p>Learn Greek, free. Log in or create an account.</p>
+  <form method="post" action="/login">
+    <input name="email" type="email" placeholder="email" required>
+    <input name="password" type="password" placeholder="password" required>
+    <button>Log in</button>
+  </form>
+  <hr>
+  <form method="post" action="/signup">
+    <input name="display_name" placeholder="name (optional)">
+    <input name="email" type="email" placeholder="email" required>
+    <input name="password" type="password" placeholder="password (10+ chars)" required minlength="10">
+    <button>Sign up</button>
+  </form>
+</body>
+</html>

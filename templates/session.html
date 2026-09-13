@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practice — Greek Tutor</title>
+  <style>
+    body{font-family:system-ui;max-width:38rem;margin:0 auto;padding:1rem;
+         display:flex;flex-direction:column;height:100vh;box-sizing:border-box}
+    #log{flex:1;overflow-y:auto;border:1px solid #ddd;border-radius:.5rem;padding:1rem}
+    .msg{margin:.5rem 0;padding:.6rem .8rem;border-radius:.6rem;max-width:85%;white-space:pre-wrap}
+    .me{background:#e3f0ff;margin-left:auto}
+    .tutor{background:#f3f3f3}
+    form{display:flex;gap:.5rem;margin-top:.6rem}
+    input{flex:1;padding:.6rem;font-size:1rem}
+    button{padding:.6rem 1rem;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div id="log"></div>
+  <form id="f">
+    <input id="msg" autocomplete="off" placeholder="Γράψε στα ελληνικά… (write in Greek)" required>
+    <button>Send</button>
+    <button type="button" id="end">End session</button>
+  </form>
+  <script>
+    let sid = null;
+    const log = document.getElementById('log');
+    const add = (cls, text) => {
+      const d = document.createElement('div');
+      d.className = 'msg ' + cls; d.textContent = text;
+      log.appendChild(d); log.scrollTop = log.scrollHeight;
+    };
+    async function ensureSession() {
+      if (sid) return sid;
+      const r = await fetch('/api/session/start', {method:'POST'});
+      if (!r.ok) { add('tutor', (await r.json()).detail || 'Could not start.'); throw 0; }
+      sid = (await r.json()).session_id;
+      return sid;
+    }
+    document.getElementById('f').onsubmit = async (e) => {
+      e.preventDefault();
+      const box = document.getElementById('msg');
+      const text = box.value.trim(); if (!text) return;
+      box.value = ''; add('me', text);
+      try {
+        await ensureSession();
+        const body = new URLSearchParams({message: text});
+        const r = await fetch(`/api/session/${sid}/turn`, {method:'POST', body});
+        const data = await r.json();
+        add('tutor', r.ok ? data.reply : (data.detail || 'Error.'));
+      } catch {}
+    };
+    document.getElementById('end').onclick = async () => {
+      if (!sid) { location.href = '/'; return; }
+      const r = await fetch(`/api/session/${sid}/close`, {method:'POST'});
+      const data = await r.json();
+      add('tutor', '— Session recap —\n' + (data.summary || ''));
+      sid = null;
+    };
+  </script>
+</body>
+</html>

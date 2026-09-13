@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Greek Tutor</title>
+  <style>
+    body{font-family:system-ui;max-width:32rem;margin:3rem auto;padding:0 1rem}
+    a.btn{display:inline-block;padding:.7rem 1.2rem;background:#1a5fb4;color:#fff;
+          border-radius:.4rem;text-decoration:none}
+  </style>
+</head>
+<body>
+  <h1>Γεια σου, {{ user.display_name }}!</h1>
+  <p>Level: <strong>{{ user.level_estimate }}</strong> ·
+     Practice today: <strong>{{ minutes_used }} min</strong></p>
+  <p><a class="btn" href="/practice">Start today's session →</a></p>
+  <form method="post" action="/logout"><button>Log out</button></form>
+</body>
+</html>

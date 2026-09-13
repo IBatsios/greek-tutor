@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harada Method — Greek</title>
+<style>
+  :root{
+    --bg:#0e1117; --surface:#161b24; --surface2:#1d242f; --line:#2a3240;
+    --txt:#e6edf6; --muted:#8b97a8; --dim:#5d6878;
+    --goal:#0d5eaf; --goal2:#1e7fd6;
+    --done:#2f9e6b; --wip:#c9922e;
+    --t0:#4c8fd6; --t1:#9b7fd4; --t2:#d0736b; --t3:#4fa3a3;
+    --t4:#c78a45; --t5:#6f9c4f; --t6:#c56fa1; --t7:#7d8fa6;
+    --radius:7px;
+    --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--txt); font-family:var(--font);
+    font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+    padding:28px 24px 64px;
+  }
+  .wrap{max-width:1500px;margin:0 auto}
+
+  /* ---------- header ---------- */
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:20px;
+    border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:24px}
+  h1{margin:0;font-size:25px;font-weight:650;letter-spacing:-.02em}
+  h1 .gr{color:var(--goal2);font-weight:500}
+  .sub{color:var(--muted);font-size:13.5px;margin-top:4px;max-width:640px}
+  .hdr-right{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+
+  button{
+    font-family:var(--font);font-size:12.5px;font-weight:500;color:var(--txt);
+    background:var(--surface2);border:1px solid var(--line);border-radius:var(--radius);
+    padding:7px 13px;cursor:pointer;transition:.14s;
+  }
+  button:hover{background:#252d3a;border-color:#3a4655}
+  button.primary{background:var(--goal);border-color:var(--goal2)}
+  button.primary:hover{background:var(--goal2)}
+
+  /* ---------- top panels ---------- */
+  .panels{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:14px;margin-bottom:26px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:15px 17px}
+  .panel h2{margin:0 0 10px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--dim);font-weight:600}
+  .field{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:6px;
+    color:var(--txt);font-family:var(--font);font-size:13.5px;padding:8px 10px;margin-bottom:8px}
+  .field:focus{outline:none;border-color:var(--goal2)}
+  textarea.field{resize:vertical;min-height:58px;line-height:1.45}
+  .cyclelabel{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:12px;color:var(--muted);margin-top:2px}
+  .big{font-size:29px;font-weight:650;letter-spacing:-.02em;line-height:1.1}
+  .big small{font-size:13px;font-weight:400;color:var(--muted);letter-spacing:0}
+
+  /* overall progress */
+  .bar{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-top:9px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--goal),var(--done));
+    border-radius:4px;transition:width .3s}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:11px;font-size:11.5px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .swatch{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  /* routine */
+  .routine{list-style:none;margin:0;padding:0}
+  .routine li{display:flex;align-items:center;gap:9px;padding:4.5px 0;font-size:13px}
+  .routine input{accent-color:var(--done);width:15px;height:15px;cursor:pointer;flex:none}
+  .routine label{cursor:pointer;color:var(--txt)}
+  .routine input:checked + label{color:var(--muted);text-decoration:line-through}
+
+  /* ---------- mandala ---------- */
+  .boardwrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+  @media(max-width:1180px){.boardwrap{grid-template-columns:1fr}.panels{grid-template-columns:1fr}}
+
+  .board{
+    display:grid;grid-template-columns:repeat(9,1fr);grid-auto-rows:1fr;
+    gap:3px;background:var(--line);border:2px solid var(--line);border-radius:10px;padding:3px;
+  }
+  .cell{
+    position:relative;background:var(--surface);border-radius:4px;
+    padding:7px 7px 6px;min-height:92px;cursor:pointer;
+    display:flex;flex-direction:column;justify-content:center;
+    font-size:11px;line-height:1.28;color:#cbd5e3;
+    transition:background .13s,box-shadow .13s,color .13s;
+    overflow:hidden;user-select:none;
+  }
+  .cell:hover{background:var(--surface2);box-shadow:inset 0 0 0 1px #3d4a5c}
+  .cell .gk{display:block;font-size:10px;color:var(--dim);margin-top:3px;letter-spacing:.01em}
+
+  /* block separation: thicker outer edge every 3 */
+  .cell.bx{margin-right:6px} .cell.by{margin-bottom:6px}
+
+  .cell.goal{
+    background:linear-gradient(150deg,var(--goal) 0%,#0a4a8c 100%);
+    color:#fff;font-size:12.5px;font-weight:600;text-align:center;
+    align-items:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);cursor:default;
+  }
+  .cell.goal:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+  .cell.goal .gk{color:rgba(255,255,255,.72);font-size:10.5px;margin-top:5px}
+
+  .cell.theme{font-weight:600;font-size:11.5px;text-align:center;align-items:center;
+    color:#f2f6fb;background:var(--surface2)}
+  .cell.theme::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+  .cell.theme.mirror{background:#141a23}
+  .cell.theme .pct{font-size:10px;font-weight:500;color:var(--muted);margin-top:5px}
+
+  .cell.act[data-s="1"]{background:#3a2f14;color:#f0dcae;box-shadow:inset 0 0 0 1px #6b551f}
+  .cell.act[data-s="2"]{background:#12321f;color:#a8dcc0;box-shadow:inset 0 0 0 1px #2a6b48}
+  .cell.act[data-s="2"] .gk{color:#6ba888}
+  .cell.act[data-s="2"] .num{background:var(--done);color:#fff;border-color:var(--done)}
+  .cell.act[data-s="1"] .num{background:var(--wip);color:#231a06;border-color:var(--wip)}
+
+  .num{position:absolute;top:5px;right:5px;font-size:8.5px;font-weight:600;
+    color:var(--dim);background:transparent;border:1px solid var(--line);
+    border-radius:3px;padding:0 3.5px;line-height:13px;height:14px}
+
+  .cell.dimmed{opacity:.24}
+  .cell.focusblk{box-shadow:inset 0 0 0 1.5px var(--goal2)}
+
+  /* ---------- side rail ---------- */
+  .rail{position:sticky;top:20px;display:flex;flex-direction:column;gap:14px}
+  .theme-row{display:flex;align-items:center;gap:9px;padding:7px 0;
+    border-bottom:1px solid #202836;cursor:pointer}
+  .theme-row:last-child{border-bottom:none}
+  .theme-row .dot{width:9px;height:9px;border-radius:2.5px;flex:none}
+  .theme-row .nm{font-size:12.5px;flex:1;min-width:0}
+  .theme-row .mini{width:64px;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;flex:none}
+  .theme-row .mini > i{display:block;height:100%;border-radius:3px;transition:width .3s}
+  .theme-row .n{font-size:11px;color:var(--muted);width:26px;text-align:right;flex:none}
+  .theme-row.on{background:#1a2130;border-radius:5px;padding-left:6px;padding-right:6px}
+
+  .hint{font-size:11.5px;color:var(--dim);line-height:1.5}
+  kbd{background:var(--surface2);border:1px solid var(--line);border-radius:4px;
+    padding:1px 5px;font-size:10.5px;font-family:var(--font);color:var(--muted)}
+
+  /* detail popover */
+  #detail{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  #detail .dt-th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:6px}
+  #detail .dt-a{font-size:14px;line-height:1.4;margin-bottom:9px}
+  #detail .dt-m{font-size:12px;color:var(--muted);line-height:1.5}
+  #detail .states{display:flex;gap:6px;margin-top:12px}
+  #detail .states button{flex:1;font-size:11.5px;padding:6px 4px}
+
+  footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);
+    color:var(--dim);font-size:11.5px;line-height:1.6}
+
+  @media print{
+    body{background:#fff;color:#000;padding:0}
+    .hdr-right,.rail,#detail,.hint{display:none}
+    .boardwrap{grid-template-columns:1fr}
+    .cell{min-height:70px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Harada Method — Greek <span class="gr">/ Ελληνικά</span></h1>
+    <div class="sub">One goal, eight themes, sixty-four concrete actions. Click any action cell to cycle
+      <em>not started → in progress → done</em>. Click a theme to isolate its block.</div>
+  </div>
+  <div class="hdr-right">
+    <button onclick="isolate(null)">Show all</button>
+    <button onclick="exportJSON()">Export progress</button>
+    <button onclick="document.getElementById('imp').click()">Import</button>
+    <input id="imp" type="file" accept="application/json" style="display:none" onchange="importJSON(event)">
+    <button class="primary" onclick="window.print()">Print</button>
+  </div>
+</header>
+
+<div class="panels">
+  <div class="panel">
+    <h2>Central goal · Ο ΣΤΟΧΟΣ</h2>
+    <textarea class="field" id="goalText">Hold a real, unscripted conversation in Greek — 10 minutes, everyday topics, without switching to English.</textarea>
+    <h2 style="margin-top:12px">Current 90-day target</h2>
+    <input class="field" id="cycleText" value="Finish A1 lessons 1–12 and hold a 5-minute introduction conversation.">
+    <div class="cyclelabel">
+      <span>Cycle start <input id="cycleStart" type="date" class="field"
+        style="width:auto;display:inline-block;margin:0 0 0 4px;padding:3px 6px;font-size:12px"></span>
+      <span id="cycleDays">—</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Progress · 64 actions</h2>
+    <div class="big"><span id="pctDone">0</span>%<small> &nbsp;<span id="cntDone">0</span> done · <span id="cntWip">0</span> in progress</small></div>
+    <div class="bar"><i id="barFill" style="width:0%"></i></div>
+    <div class="legend">
+      <span><i class="swatch" style="background:#161b24;border:1px solid #2a3240"></i>Not started</span>
+      <span><i class="swatch" style="background:#c9922e"></i>In progress</span>
+      <span><i class="swatch" style="background:#2f9e6b"></i>Done</span>
+    </div>
+    <div class="hint" style="margin-top:12px">Harada's rule: keep <strong>3–5</strong> actions in progress at once.
+      More than that and none of them move.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Daily routine · Η ΡΟΥΤΙΝΑ</h2>
+    <ul class="routine" id="routineList"></ul>
+    <div class="hint" style="margin-top:8px">Resets are manual — this is the check sheet, not a streak tracker.</div>
+  </div>
+</div>
+
+<div class="boardwrap">
+  <div class="board" id="board"></div>
+
+  <div class="rail">
+    <div class="panel">
+      <h2>Eight themes</h2>
+      <div id="themeList"></div>
+    </div>
+    <div id="detail">
+      <div class="dt-th" style="color:var(--dim)">No cell selected</div>
+      <div class="dt-a" style="color:var(--muted);font-size:13px">Click any of the 64 outer cells to see what it means and how it will be measured.</div>
+    </div>
+    <div class="panel">
+      <h2>How to read the grid</h2>
+      <div class="hint">
+        The centre 3×3 block holds the goal and the eight themes.
+        Each of the eight surrounding blocks expands one theme into eight actions —
+        the theme name repeats in that block's centre, mirroring its position in the middle.
+        <br><br>
+        <kbd>click</kbd> advance a cell &nbsp; <kbd>shift+click</kbd> go back &nbsp; <kbd>Esc</kbd> clear focus
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <strong>Measurement column</strong> in each cell's detail is the hook for the tutor app — every action is written
+  so it resolves to something already in the schema (<code>user_lessons.score</code>, <code>user_vocab</code> SRS state,
+  <code>tutor_sessions.error_patterns</code>, <code>usage_ledger.ai_minutes</code>) rather than to a subjective feeling.
+  Progress is held in memory; use <em>Export progress</em> to keep it between sessions.
+</footer>
+
+</div>
+
+<script>
+/* ------------------------------------------------------------------ data */
+const GOAL_GR = "Μιλάω ελληνικά";
+
+const THEMES = [
+  { name:"Pronunciation & Script", gr:"Προφορά & Αλφάβητο", acc:"var(--t0)", hex:"#4c8fd6",
+    actions:[
+      ["Write all 24 letters from memory, upper and lower case","Lesson A1-1 objective 'recognize all 24 letters' scored ≥0.9"],
+      ["Final sigma ς vs σ — 20 words with zero slips","'σ/ς final sigma' absent from error_patterns for 5 sessions"],
+      ["Drill the vowel digraphs αι ει οι ου","Lesson A1-1 objective 'vowel combinations' scored ≥0.9"],
+      ["Drill the clusters μπ ντ γκ τζ in initial and medial position","Tutor pronunciation check, 10/10"],
+      ["Place the τόνος correctly on 50 known words","Written drill; stress errors <5% of tutor turns"],
+      ["Shadow 5 minutes of native audio every day","Routine check sheet, 6 of 7 days"],
+      ["Record yourself reading a paragraph; compare against a native read","Monthly recording stored, self-scored"],
+      ["Hear the difference: δ/θ, and γ before ε/ι vs α/ο/ου","Minimal-pair listening drill, 18/20"],
+    ]},
+  { name:"Vocabulary & SRS", gr:"Λεξιλόγιο", acc:"var(--t1)", hex:"#9b7fd4",
+    actions:[
+      ["Clear the SRS due queue every day — zero overdue","COUNT(user_vocab WHERE srs_due_date < today) = 0"],
+      ["Take on 10 new words per tutor session","vocab_events with result='introduced' ≥10 per session"],
+      ["500 words held at ≥80% recall","times_correct/times_seen ≥0.8 across 500 rows"],
+      ["1,500 words held at ≥80% recall","same, at 1,500 rows"],
+      ["Learn every noun with its article — never bare","vocab_items.greek stored as 'ο καφές', not 'καφές'"],
+      ["Learn every verb as 1st person singular, and be able to conjugate it","pos='verb' rows drilled in conjugation turns"],
+      ["Build 8 topic clusters: café, market, travel, home, work, health, weather, family","vocab_items.tags covers all 8, ≥40 words each"],
+      ["Weekly leech review — re-teach anything failed 3 or more times","srs_ease ≤1.5 rows surfaced every Sunday"],
+    ]},
+  { name:"Grammar & Morphology", gr:"Γραμματική", acc:"var(--t2)", hex:"#d0736b",
+    actions:[
+      ["Conjugate είμαι and έχω with no hesitation","Lessons A1-3 and A1-7 scored ≥0.9"],
+      ["Conjugate -ω and -άω verbs in the present","Lessons A1-9 and A1-16 scored ≥0.9"],
+      ["Nominative, accusative and genitive of ο / η / το plus noun","Lessons A1-5, A1-13, A1-21 scored ≥0.85"],
+      ["Predict gender from the ending: -ος -α -η -ι -ο -μα","'gender agreement' absent from error_patterns for 5 sessions"],
+      ["Negate with δεν and μην; ask questions by intonation","Lesson A1-9 objective 'negation with δεν'"],
+      ["Future with θα, subjunctive with να","Lesson A1-19 scored ≥0.85"],
+      ["Aorist of the 30 most common verbs","A2 lesson gate; tutor drill 27/30"],
+      ["Clitic pronoun order — μου το έδωσε, not έδωσε μου το","B1 marker; tracked as an error pattern"],
+    ]},
+  { name:"Listening", gr:"Ακρόαση", acc:"var(--t3)", hex:"#4fa3a3",
+    actions:[
+      ["10 minutes of Greek audio daily, first pass with no subtitles","Routine check sheet, 6 of 7 days"],
+      ["Greek radio or a podcast during the commute, 3× a week","Routine check sheet"],
+      ["One episode of a Greek series per week, Greek subtitles","Weekly log"],
+      ["Transcribe 60 seconds of native speech verbatim","Written submission graded by tutor ≥0.8"],
+      ["Numbers and prices dictation — hear 20, write 20","Lesson A1-15 objective; 18/20"],
+      ["Get the gist of a 2-minute news bulletin","Tutor comprehension check, 4 of 5 questions"],
+      ["Run whole tutor sessions with no English fallback","tutor_sessions with zero English turns"],
+      ["Catch fast-speech contractions: στο, στη, σ' αυτό, π' το","Lesson A1-14 objective 'σε/από contractions'"],
+    ]},
+  { name:"Speaking", gr:"Ομιλία", acc:"var(--t4)", hex:"#c78a45",
+    actions:[
+      ["15 minutes of unscripted talking per session","tutor_sessions.minutes_used in speaking mode"],
+      ["Narrate your day out loud, in the past tense","Lesson A1-22 then A2 aorist work"],
+      ["Order food, shop, and ask directions unprompted","Lessons A1-8, A1-14, A1-15 role-plays passed"],
+      ["Describe a photo for 90 seconds without stopping","Timed drill; no pause over 4 seconds"],
+      ["One conversation a week with a native speaker or partner","Weekly log"],
+      ["Drive English filler words to zero in a session","English-token count per session = 0"],
+      ["Catch and fix your own gender agreement mid-sentence","Self-corrections logged, ≥3 per session"],
+      ["Hold a 10-minute conversation on a topic you did not prepare","THE GOAL — final exit check"],
+    ]},
+  { name:"Reading", gr:"Ανάγνωση", acc:"var(--t5)", hex:"#6f9c4f",
+    actions:[
+      ["Read every sign, menu and label you meet, out loud","Daily habit"],
+      ["Finish one A1 graded reader cover to cover","Logged completion"],
+      ["Read one set of Greek news headlines daily","Routine check sheet"],
+      ["Read a Greek children's book start to finish","Logged completion"],
+      ["Read aloud 5 minutes a day for fluency, not comprehension","Routine check sheet, 6 of 7 days"],
+      ["Pull 10 unknown words out of every text into the SRS","vocab_events sourced from reading"],
+      ["Watch with Greek subtitles, not English","Weekly log"],
+      ["Read an A2 short story with fewer than 10 lookups","A2 gate check"],
+    ]},
+  { name:"Writing", gr:"Γραφή", acc:"var(--t6)", hex:"#c56fa1",
+    actions:[
+      ["Three sentences about your day, every day","Routine check sheet"],
+      ["Write out a café order and a shopping list in Greek","Lessons A1-8 and A1-15"],
+      ["Learn the Greek keyboard layout, accents included","Typed input in tutor sessions"],
+      ["Write 100 words about yourself","Tutor-graded ≥0.8"],
+      ["Send a real message to a real Greek speaker","Logged once"],
+      ["Rewrite five tutor-flagged errors correctly each session","error_patterns worked through per session"],
+      ["Keep one Greek-only line in your daily journal","Routine check sheet"],
+      ["Write a 200-word narrative in the past tense","A2 gate check"],
+    ]},
+  { name:"Habit & Environment", gr:"Συνήθεια & Περιβάλλον", acc:"var(--t7)", hex:"#7d8fa6",
+    actions:[
+      ["45 minutes a day, in the same time block","profiles.daily_goal_minutes met; usage_ledger.ai_minutes"],
+      ["Never miss two days in a row","profiles.streak_count; gap ≤1 day"],
+      ["Switch your phone and OS language to Greek","One-time, then permanent"],
+      ["Review the session error_patterns every week","Weekly ritual; feeds next cycle's focus"],
+      ["Keep one 90-day target visible; reset it every quarter","This board's cycle field"],
+      ["A Greek music playlist running in the background","Passive exposure, daily"],
+      ["Label 20 things around the house with Greek sticky notes","One-time, 20 labels"],
+      ["Record a monthly self-assessment and compare it to last month","12 recordings a year"],
+    ]},
+];
+
+const ROUTINE = [
+  "Clear the SRS due queue",
+  "One tutor session (45 min)",
+  "10 min listening, no subtitles",
+  "Read aloud for 5 minutes",
+  "Three sentences written in Greek",
+  "Shadow 5 minutes of native audio",
+];
+
+/* Harada layout: the eight non-centre positions of a 3×3, in reading order. */
+const POS = [[0,0],[0,1],[0,2],[1,0],[1,2],[2,0],[2,1],[2,2]];
+
+/* ------------------------------------------------------------------ state */
+const state = {
+  actions: THEMES.map(()=>[0,0,0,0,0,0,0,0]),
+  routine: ROUTINE.map(()=>false),
+  goal: null, cycle: null, cycleStart: null,
+};
+let focusTheme = null;
+let selected = null;
+
+/* ------------------------------------------------------------------ build */
+const board = document.getElementById('board');
+
+function build(){
+  board.innerHTML = '';
+  for(let row=0; row<9; row++){
+    for(let col=0; col<9; col++){
+      const br = Math.floor(row/3), bc = Math.floor(col/3);
+      const ir = row%3, ic = col%3;
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      if(ic===2 && bc<2) cell.classList.add('bx');
+      if(ir===2 && br<2) cell.classList.add('by');
+
+      const isCentreBlock = (br===1 && bc===1);
+      const posIdx = POS.findIndex(p=>p[0]===ir && p[1]===ic);
+      const blockIdx = POS.findIndex(p=>p[0]===br && p[1]===bc);
+
+      if(isCentreBlock && ir===1 && ic===1){
+        cell.classList.add('goal');
+        cell.innerHTML = `<div id="goalCell">Hold a real conversation in Greek</div>
+          <span class="gk">${GOAL_GR}</span>`;
+      } else if(isCentreBlock){
+        const t = THEMES[posIdx];
+        cell.classList.add('theme');
+        cell.style.setProperty('--acc', t.acc);
+        cell.dataset.theme = posIdx;
+        cell.innerHTML = `${t.name}<span class="gk">${t.gr}</span>
+          <span class="pct" data-pct="${posIdx}">0/8</span>`;
+        cell.onclick = ()=> isolate(focusTheme===posIdx ? null : posIdx);
+      } else if(ir===1 && ic===1){
+        const t = THEMES[blockIdx];
+        cell.classList.add('theme','mirror');
+        cell.style.setProperty('--acc', t.acc);
+        cell.dataset.theme = blockIdx;
+        cell.innerHTML = `${t.name}<span class="gk">${t.gr}</span>
+          <span class="pct" data-pct="${blockIdx}">0/8</span>`;
+        cell.onclick = ()=> isolate(focusTheme===blockIdx ? null : blockIdx);
+      } else {
+        const t = THEMES[blockIdx];
+        const [label, measure] = t.actions[posIdx];
+        cell.classList.add('act');
+        cell.dataset.t = blockIdx; cell.dataset.a = posIdx; cell.dataset.s = 0;
+        cell.innerHTML = `<span class="num">${posIdx+1}</span>${label}`;
+        cell.title = label;
+        cell.onclick = (e)=>{
+          const d = e.shiftKey ? -1 : 1;
+          state.actions[blockIdx][posIdx] = (state.actions[blockIdx][posIdx] + d + 3) % 3;
+          selected = [blockIdx, posIdx];
+          render();
+        };
+      }
+      cell.dataset.block = blockIdx;
+      board.appendChild(cell);
+    }
+  }
+}
+
+function buildRail(){
+  const wrap = document.getElementById('themeList');
+  wrap.innerHTML = '';
+  THEMES.forEach((t,i)=>{
+    const row = document.createElement('div');
+    row.className = 'theme-row'; row.dataset.row = i;
+    row.innerHTML = `<i class="dot" style="background:${t.hex}"></i>
+      <span class="nm">${t.name}</span>
+      <span class="mini"><i data-mini="${i}" style="width:0%;background:${t.hex}"></i></span>
+      <span class="n" data-n="${i}">0/8</span>`;
+    row.onclick = ()=> isolate(focusTheme===i ? null : i);
+    wrap.appendChild(row);
+  });
+}
+
+function buildRoutine(){
+  const ul = document.getElementById('routineList');
+  ul.innerHTML = '';
+  ROUTINE.forEach((r,i)=>{
+    const li = document.createElement('li');
+    li.innerHTML = `<input type="checkbox" id="r${i}"><label for="r${i}">${r}</label>`;
+    li.querySelector('input').onchange = e => { state.routine[i] = e.target.checked; };
+    ul.appendChild(li);
+  });
+}
+
+/* ------------------------------------------------------------------ render */
+function render(){
+  let done=0, wip=0;
+  document.querySelectorAll('.cell.act').forEach(c=>{
+    const s = state.actions[+c.dataset.t][+c.dataset.a];
+    c.dataset.s = s;
+  });
+  THEMES.forEach((t,i)=>{
+    const d = state.actions[i].filter(v=>v===2).length;
+    const w = state.actions[i].filter(v=>v===1).length;
+    done += d; wip += w;
+    document.querySelectorAll(`[data-pct="${i}"]`).forEach(el=> el.textContent = `${d}/8`);
+    const mini = document.querySelector(`[data-mini="${i}"]`);
+    if(mini) mini.style.width = (d/8*100)+'%';
+    const n = document.querySelector(`[data-n="${i}"]`);
+    if(n) n.textContent = `${d}/8`;
+  });
+  document.getElementById('pctDone').textContent = Math.round(done/64*100);
+  document.getElementById('cntDone').textContent = done;
+  document.getElementById('cntWip').textContent = wip;
+  document.getElementById('barFill').style.width = (done/64*100)+'%';
+  renderDetail();
+  renderCycle();
+}
+
+function renderDetail(){
+  const el = document.getElementById('detail');
+  if(!selected){ return; }
+  const [ti,ai] = selected;
+  const t = THEMES[ti];
+  const [label, measure] = t.actions[ai];
+  const s = state.actions[ti][ai];
+  el.innerHTML = `
+    <div class="dt-th" style="color:${t.hex}">${t.name} · action ${ai+1}</div>
+    <div class="dt-a">${label}</div>
+    <div class="dt-m"><strong style="color:var(--txt)">Measured by:</strong> ${measure}</div>
+    <div class="states">
+      <button onclick="setState(${ti},${ai},0)"${s===0?' class="primary"':''}>Not started</button>
+      <button onclick="setState(${ti},${ai},1)"${s===1?' class="primary"':''}>In progress</button>
+      <button onclick="setState(${ti},${ai},2)"${s===2?' class="primary"':''}>Done</button>
+    </div>`;
+}
+function setState(t,a,s){ state.actions[t][a]=s; selected=[t,a]; render(); }
+
+function isolate(i){
+  focusTheme = i;
+  document.querySelectorAll('.cell').forEach(c=>{
+    c.classList.remove('dimmed','focusblk');
+    if(i===null) return;
+    const b = +c.dataset.block;
+    const isCentre = c.classList.contains('goal') ||
+                     (c.classList.contains('theme') && !c.classList.contains('mirror'));
+    if(b===i){ c.classList.add('focusblk'); }
+    else if(!isCentre){ c.classList.add('dimmed'); }
+  });
+  document.querySelectorAll('.theme-row').forEach(r=>
+    r.classList.toggle('on', i!==null && +r.dataset.row===i));
+}
+
+function renderCycle(){
+  const v = document.getElementById('cycleStart').value;
+  const out = document.getElementById('cycleDays');
+  if(!v){ out.textContent = '—'; return; }
+  const start = new Date(v + 'T00:00:00');
+  const now = new Date(); now.setHours(0,0,0,0);
+  const gone = Math.round((now - start)/86400000);
+  const left = 90 - gone;
+  out.textContent = left >= 0 ? `Day ${gone+1} of 90 · ${left} left`
+                              : `Cycle ended ${-left} days ago — set a new target`;
+}
+
+/* ------------------------------------------------------------------ io */
+function exportJSON(){
+  state.goal = document.getElementById('goalText').value;
+  state.cycle = document.getElementById('cycleText').value;
+  state.cycleStart = document.getElementById('cycleStart').value;
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'greek-harada-progress.json';
+  a.click();
+}
+function importJSON(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = JSON.parse(r.result);
+      if(Array.isArray(d.actions)) state.actions = d.actions;
+      if(Array.isArray(d.routine)) state.routine = d.routine;
+      if(d.goal) document.getElementById('goalText').value = d.goal;
+      if(d.cycle) document.getElementById('cycleText').value = d.cycle;
+      if(d.cycleStart) document.getElementById('cycleStart').value = d.cycleStart;
+      state.routine.forEach((v,i)=>{ const el=document.getElementById('r'+i); if(el) el.checked=v; });
+      selected = null;
+      document.getElementById('detail').innerHTML =
+        '<div class="dt-th" style="color:var(--dim)">Progress imported</div>' +
+        '<div class="dt-a" style="color:var(--muted);font-size:13px">Click any cell to continue.</div>';
+      render();
+    }catch(e){ alert('Could not read that file.'); }
+  };
+  r.readAsText(f);
+  ev.target.value = '';
+}
+
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') isolate(null); });
+document.getElementById('cycleStart').addEventListener('change', renderCycle);
+
+/* ------------------------------------------------------------------ init */
+(function(){
+  const d = new Date();
+  document.getElementById('cycleStart').value =
+    d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  build(); buildRail(); buildRoutine(); render();
+})();
+</script>
+</body>
+</html>

@@ -5,11 +5,12 @@ so a DB leak doesn't leak live sessions.
 """
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+import asyncpg
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
+from fastapi import APIRouter, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
 from . import config
@@ -27,7 +28,7 @@ def _hash_token(token: str) -> str:
 
 async def create_session(user_id: int, response: Response) -> None:
     token = secrets.token_urlsafe(32)
-    expires = datetime.now(timezone.utc) + timedelta(days=config.SESSION_TTL_DAYS)
+    expires = datetime.now(UTC) + timedelta(days=config.SESSION_TTL_DAYS)
     await pool().execute(
         "INSERT INTO auth_sessions (user_id, token_hash, expires_at) VALUES ($1,$2,$3)",
         user_id, _hash_token(token), expires,
@@ -39,7 +40,7 @@ async def create_session(user_id: int, response: Response) -> None:
     )
 
 
-async def current_user(request: Request) -> asyncpg.Record | None:  # type: ignore[name-defined]
+async def current_user(request: Request) -> asyncpg.Record | None:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         return None
@@ -80,8 +81,8 @@ async def signup(email: str = Form(...), password: str = Form(...),
                     "INSERT INTO users (email, password_hash) VALUES ($1,$2) RETURNING id",
                     email, ph.hash(password),
                 )
-            except Exception:
-                raise HTTPException(400, "That email is already registered.")
+            except asyncpg.UniqueViolationError:
+                raise HTTPException(400, "That email is already registered.") from None
             await conn.execute(
                 "INSERT INTO profiles (user_id, display_name) VALUES ($1,$2)",
                 user_id, display_name.strip() or email.split("@")[0],
@@ -103,7 +104,7 @@ async def login(email: str = Form(...), password: str = Form(...)):
     try:
         ph.verify(row["password_hash"], password)
     except VerifyMismatchError:
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "Invalid email or password.") from None
     if ph.check_needs_rehash(row["password_hash"]):
         await pool().execute("UPDATE users SET password_hash=$1 WHERE id=$2",
                              ph.hash(password), row["id"])

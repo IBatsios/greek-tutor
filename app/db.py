@@ -1,4 +1,5 @@
 import asyncpg
+
 from . import config
 
 _pool: asyncpg.Pool | None = None

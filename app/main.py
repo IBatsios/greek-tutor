@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import auth, db, quota, tutor
+from . import auth, db, harada_api, quota, tutor
 from .auth import current_user, require_user
 
 
@@ -19,6 +19,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Greek Tutor", lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(tutor.router)
+app.include_router(harada_api.router)
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 
 

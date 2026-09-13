@@ -1,18 +1,35 @@
 """SM-2 style SRS updates driven by the tutor's per-turn vocab_events."""
+import re
 from datetime import date, timedelta
 
 from .db import pool
 
+_TAG = re.compile(r"^[a-z][a-z0-9_-]{1,29}\Z")
 
-async def apply_vocab_event(user_id: int, greek: str, english: str, result: str) -> None:
-    """result: 'correct' | 'incorrect' | 'introduced'"""
+_UPSERT_ITEM = """
+INSERT INTO vocab_items (greek, english, tags)
+VALUES ($1, $2, CASE WHEN $3::text IS NULL THEN '{}'::text[] ELSE ARRAY[$3::text] END)
+ON CONFLICT (greek, english) DO UPDATE SET
+  tags = CASE WHEN $3::text IS NULL OR $3::text = ANY(vocab_items.tags)
+              THEN vocab_items.tags ELSE vocab_items.tags || $3::text END
+RETURNING id
+"""
+
+
+def clean_tag(tag: object) -> str | None:
+    """Normalise a topic tag from the tutor's JSON; None when it is not a usable slug."""
+    if not isinstance(tag, str):
+        return None
+    slug = tag.strip().lower()
+    return slug if _TAG.match(slug) else None
+
+
+async def apply_vocab_event(user_id: int, greek: str, english: str, result: str,
+                            tag: object = None) -> None:
+    """result: 'correct' | 'incorrect' | 'introduced'. tag: optional topic cluster slug."""
     async with pool().acquire() as conn:
         vocab_id = await conn.fetchval(
-            """INSERT INTO vocab_items (greek, english)
-               VALUES ($1,$2)
-               ON CONFLICT (greek, english) DO UPDATE SET greek = EXCLUDED.greek
-               RETURNING id""",
-            greek.strip(), english.strip(),
+            _UPSERT_ITEM, greek.strip(), english.strip(), clean_tag(tag),
         )
         row = await conn.fetchrow(
             "SELECT srs_ease, srs_interval_d FROM user_vocab WHERE user_id=$1 AND vocab_id=$2",

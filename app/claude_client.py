@@ -22,7 +22,7 @@ CORE TEACHING RULES
 2. Make the student produce Greek in every exchange. Never send two messages in a row that only explain - always end with something for them to say, answer, or translate.
 3. Correct errors with a light touch: restate their sentence correctly, bold the fixed part, give a one-line reason, then move on. Do not lecture.
 4. Recycle the due review vocabulary (provided in the student context) naturally into conversation and exercises. Prioritize items the student keeps missing.
-5. Stay on the lesson objective. If the student digresses in Greek, that is a win - follow briefly, then steer back.
+5. Stay on the lesson objective. If the student context contains a CURRENT FOCUS block, that focus is the primary objective and the lesson is the vehicle for it. If the student digresses in Greek, that is a win - follow briefly, then steer back.
 6. Keep messages short. This is a conversation, not a textbook chapter.
 7. Use Greek script always; add transliteration only at A0-A1 and drop it once the student can read.
 
@@ -35,10 +35,10 @@ STRUCTURED OUTPUT CONTRACT
 At the END of every reply, append a fenced json block exactly in this shape (the app parses and strips it; never mention it):
 
 ```json
-{"vocab_events": [{"greek": "...", "english": "...", "result": "correct|incorrect|introduced"}], "error_tags": [], "objective_progress": 0.0, "level_signal": "at"}
+{"vocab_events": [{"greek": "...", "english": "...", "result": "correct|incorrect|introduced", "tag": "cafe"}], "error_tags": [], "objective_progress": 0.0, "level_signal": "at"}
 ```
 
-- vocab_events: every review/new word exercised this turn, with outcome.
+- vocab_events: every review/new word exercised this turn, with outcome. Add "tag" only when the word clearly belongs to one topic cluster from: cafe, market, travel, home, work, health, weather, family; omit it otherwise.
 - error_tags: short stable slugs for grammar errors observed (reuse recurring tags from the student context).
 - objective_progress: running estimate 0.0-1.0 of today's objective.
 - level_signal: "at", "below", or "above" the student's current level, this turn.
@@ -83,7 +83,8 @@ EVAL_PROMPT = """You are evaluating a completed Greek tutoring session. Given th
 {"summary": "<3-5 sentence summary of what was covered and how the student did>",
  "error_patterns": ["slug", ...],
  "lesson_score": 0.0,
- "level_recommendation": "keep|raise|lower"}"""
+ "level_recommendation": "keep|raise|lower"}
+lesson_score is a fraction from 0.0 to 1.0 (how well today's lesson objectives were met), never a percentage."""
 
 
 async def evaluate_session(transcript: list[dict]) -> tuple[dict, int, int]:

@@ -34,7 +34,7 @@ step 5 is deferred to the tracker; step 6 is next.
   Rescore button, *Start today's session*. Expired sessions bounce to `/login` (the API
   still answers a 303, see *Deferred*). Vanilla JS, no innerHTML with user text.
 - `templates/login.html` — unused HTMX script removed.
-- Tests: 179 passing (`tests/test_harada_export.py` new; export + goal cases added to
+- Tests: 180 passing (`tests/test_harada_export.py` new; export + goal cases added to
   `tests/test_harada_db.py`). Ran against a throwaway `postgres:16` on port 5499 with all
   migrations and seeds applied.
 - Docs: README (board section, mirror, env), `HARADA_INTEGRATION.md` §7/§8 notes,

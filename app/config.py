@@ -9,6 +9,9 @@ SESSION_MAX_TURNS = int(os.environ.get("SESSION_MAX_TURNS", "120"))
 COOKIE_SECRET = os.environ["COOKIE_SECRET"]
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
 SESSION_TTL_DAYS = 30
+# IANA zone used for every "today" - in Python (app/clock.py) and on every DB
+# connection (app/db.py) - so CURRENT_DATE and clock.today() never disagree.
+APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "UTC")
 # Board export for the tracker (docs/HARADA_BOARD_CONTRACT.md). Empty = off.
 HARADA_EXPORT_PATH = os.environ.get("HARADA_EXPORT_PATH", "")
 # Pin the export to one users.id; unset = export only while exactly one account exists.

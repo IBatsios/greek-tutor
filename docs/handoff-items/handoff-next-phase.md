@@ -56,6 +56,16 @@ cell to done (green, theme 1/8, `totals.done` 1 in the file) → no console erro
 **Not verified:** the phone-width layout (`@media(max-width:700px)` hides labels and
 shrinks cells) — the harness could not resize the viewport. Check it on a real phone.
 
+## Timezone fix (found while opening the PR)
+
+`test_set_goal_round_trips_and_restart_resets_the_cycle` failed after 20:00 local: Postgres
+evaluated `CURRENT_DATE` in the container's UTC while the app used the OS-local date, so
+goal `cycle_start`, `usage_ledger.usage_date`, `routine_log.log_date` and SRS due dates
+were a day off from what the app computed every evening. Fix: `APP_TIMEZONE` (config,
+default UTC; `.env.example` sets America/New_York) is applied to every pooled connection
+and is the only zone `app/clock.py` uses; `date.today()` is banned in `app/` by
+`tests/test_clock.py`. `tzdata` added to requirements for Windows.
+
 ## Unverified — still first next session
 
 1. **Run a real session against the Claude API.** Same list as before: fill `.env`, start

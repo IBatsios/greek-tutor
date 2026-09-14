@@ -12,7 +12,7 @@ from datetime import date
 import asyncpg
 from fastapi import APIRouter, Depends, Form, HTTPException
 
-from . import harada
+from . import clock, harada
 from .auth import require_user
 from .db import pool
 from .harada_metrics import ROUTINE_KEY
@@ -73,7 +73,7 @@ async def log_routine(key: str = Form(...), checked: bool = Form(True),
     """Daily check sheet. The sheet UI lives in the tracker; this stays as the write path."""
     if not ROUTINE_KEY.match(key):
         raise HTTPException(400, "key must be a short snake_case identifier.")
-    day = log_date or date.today()
+    day = log_date or clock.today()
     checks = await pool().fetchval(
         """INSERT INTO routine_log (user_id, log_date, checks)
            VALUES ($1, $2, jsonb_build_object($3::text, $4::boolean))

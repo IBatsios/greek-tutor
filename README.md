@@ -23,6 +23,7 @@ uv venv .venv && source .venv/bin/activate      # Windows: .venv/Scripts/activat
 uv pip install -r requirements.txt
 cp .env.example .env   # fill in DATABASE_URL, ANTHROPIC_API_KEY, COOKIE_SECRET
                        # optional: HARADA_EXPORT_PATH to mirror the board for the tracker
+                       # set APP_TIMEZONE to your zone so "today" matches your evenings
 
 # 3. Run
 set -a; source .env; set +a

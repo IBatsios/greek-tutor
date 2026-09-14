@@ -1,7 +1,8 @@
 """SM-2 style SRS updates driven by the tutor's per-turn vocab_events."""
 import re
-from datetime import date, timedelta
+from datetime import timedelta
 
+from . import clock
 from .db import pool
 
 _TAG = re.compile(r"^[a-z][a-z0-9_-]{1,29}\Z")
@@ -41,7 +42,7 @@ async def apply_vocab_event(user_id: int, greek: str, english: str, result: str,
                                            srs_due_date)
                    VALUES ($1,$2,1,$3,$4)""",
                 user_id, vocab_id, 1 if result == "correct" else 0,
-                date.today() + timedelta(days=1),
+                clock.today() + timedelta(days=1),
             )
             return
 
@@ -62,7 +63,7 @@ async def apply_vocab_event(user_id: int, greek: str, english: str, result: str,
                  times_correct = times_correct + $6
                WHERE user_id=$1 AND vocab_id=$2""",
             user_id, vocab_id, ease, interval,
-            date.today() + timedelta(days=interval),
+            clock.today() + timedelta(days=interval),
             1 if result == "correct" else 0,
         )
 

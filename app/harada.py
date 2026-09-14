@@ -12,12 +12,12 @@ import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import asyncpg
 
-from . import config, harada_export
+from . import clock, config, harada_export
 from . import harada_metrics as hm
 from .db import pool
 
@@ -139,7 +139,7 @@ async def _session_facts(conn: asyncpg.Connection, user_id: int) -> tuple[hm.Ses
 
 async def load_facts(user_id: int) -> hm.Facts:
     """Everything the scorers need for one learner, in a handful of queries."""
-    today = date.today()
+    today = clock.today()
     since = today - timedelta(days=FACT_DAYS)
     async with pool().acquire() as conn:
         lessons = await conn.fetch(
@@ -376,7 +376,7 @@ async def set_goal(user_id: int, goal_text: str, cycle_text: str, cycle_days: in
         user_id, goal_text, cycle_text, cycle_days, restart_cycle,
     )
     await _export(user_id)
-    goal = harada_export.goal_dict(row, today=date.today())
+    goal = harada_export.goal_dict(row, today=clock.today())
     assert goal is not None  # RETURNING * on an upsert always yields the row
     return goal
 

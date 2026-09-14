@@ -20,6 +20,9 @@ Pick up from the newest file in `docs/handoff-items/`.
 
 - Keep scoring pure: `harada_metrics.py` never touches the DB; `harada.py` does
   the I/O. New metric kinds need a scorer, a `validate_args` check, and tests.
+- One calendar: `app/clock.py` (`APP_TIMEZONE`) is applied to every DB connection, so
+  `CURRENT_DATE` in SQL and `clock.today()` agree. Never call `date.today()` in `app/`
+  (`tests/test_clock.py` enforces it).
 - Cell definitions live in `seed/harada.sql`; `tests/test_harada_seed.py` checks
   all 64 against the metric contracts. A cell is `manual` unless the number it
   reads already exists in the schema — do not invent measurements.

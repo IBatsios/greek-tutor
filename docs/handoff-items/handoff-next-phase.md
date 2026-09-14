@@ -1,103 +1,122 @@
-# Handoff — Harada engine shipped; board UI next
+# Handoff — board UI + tracker contract shipped; cycle close next
 
-**Date:** 2026-09-13 · **Branch:** `feature/harada-engine` (uncommitted at time of writing)
-**Plan of record:** `docs/HARADA_INTEGRATION.md` (build order §8). Steps 1–3 are done here.
+**Date:** 2026-09-13 · **Branch:** `feature/harada-board-ui`
+**Plan of record:** `docs/HARADA_INTEGRATION.md` (build order §8). Steps 1–4 are done;
+step 5 is deferred to the tracker; step 6 is next.
+**Previous handoff** (engine, steps 1–3): in git history of this file, commit `babb448`.
 
 ## Decisions made this session
 
 | Decision | Choice | Why |
 |---|---|---|
-| Audience | Single learner first; keep multi-user schema | Email verification, rate limiting and quota UI only matter when a second person signs up |
-| Sequencing | Skipped the "make Phase 1 run + test harness" phase, went straight to the engine | Yanni's call. Consequence: the app has never been run end to end against the real Claude API — see *Unverified* below |
-| Voice | Parked through the first 90-day cycle | 24 of 64 cells are audio-shaped; they are `manual` or `routine_days` for now |
-| Frontend | Vanilla JS fetch + JSON endpoints; no HTMX | Board prototype already renders in plain JS; session page already uses fetch; theme rollups are easier from one JSON payload than out-of-band swaps |
-| Models | Unchanged (Haiku for turns, Sonnet 4.6 for eval) | Not decided yet — see *Deferred* |
+| Repo layout | greek-tutor and tracker stay separate repos under `Projects/` | Python/FastAPI vs TypeScript/Prisma, different auth and databases: nothing to share at code level, only a data contract |
+| Integration | greek-tutor **owns** the Greek board and exports it; the tracker **mirrors** it through `linked` cells and never writes back | Only the tutor has lesson scores, SRS state and error patterns; the tracker already pulls every external source read-only |
+| Transport | A JSON file (`HARADA_EXPORT_PATH`), rewritten atomically after every board change | Matches how the tracker reads `data/*.json`; no token, no second listener. An authenticated endpoint can come later if freshness matters |
+| Routine check sheet | **Not built here.** Lives in the tracker (habits with `board_action_id`) | One daily checklist, on the phone-first page with Hermes tools. `routine_log`, the scorer and `POST /api/harada/routine` stay as the write path |
+| Multi-user + one file | Unpinned export writes only while there is exactly one account; `HARADA_EXPORT_USER_ID` pins it after that | Review finding: otherwise one learner's board could land in another's mirror |
+| Board interaction | Click selects a cell; the detail panel holds Focus/Unfocus and (manual only) the three state buttons | The handoff sketched click-to-focus; a select-then-act panel is less surprising and shows `measure` first |
 
 ## What shipped
 
-- `migrations/003_harada.sql` — goals, themes, actions, per-user cell state, routine log,
-  `lessons.theme_ids`, `tutor_sessions.focus_action_id`.
-- `seed/harada.sql` — 8 themes + 64 actions ported from `docs/harada-board.html`, with a
-  measurability audit: 40 computed, 24 `manual`. Re-runnable (ON CONFLICT updates).
-  Lesson cells reference lessons by `(level, seq)`, never by id.
-- `app/harada_metrics.py` — pure scorers, one per `metric_kind`, plus `validate_args`,
-  `is_greek_only`, `is_sessionable`, `state_for`. Windows are always "the last N", so a
-  new learner never sees phantom done cells.
-- `app/harada.py` — `load_facts`, `recompute`, `pick_focus`, `focus_for_action`,
-  `focus_block`, `set_focus` (max 5), `set_manual_state` (manual cells only).
-- `app/harada_api.py` — `GET /api/harada`, `POST goal | action/{id}/focus |
-  action/{id}/state | routine | recompute`. Form fields in, JSON out.
-- `app/tutor.py` — session start picks the weakest sessionable focus cell (falls back to
-  next lesson); per-turn context appends a `CURRENT FOCUS` block; close rescores the board
-  (failures logged, never block closing).
-- `app/srs.py` + `app/claude_client.py` — optional `"tag"` on `vocab_events` (one of the 8
-  topic clusters) so `vocab_recall` cells can actually move; tutor rule 5 now says the
-  focus block overrides the generic lesson objective.
-- Tooling: `.gitignore`, `pyproject.toml` (ruff, pytest asyncio auto), `requirements-dev.txt`.
-  `httpx` is in dev requirements for Starlette's TestClient (the optional-date form field
-  on `/api/harada/routine` was verified with it: omitted/empty → None, ISO → date, junk → 422).
-- Tests: 132 passing (`tests/test_harada_metrics.py`, `test_harada_seed.py`,
-  `test_harada_db.py`, `test_app_wiring.py`). DB tests ran against a throwaway
-  `postgres:16` container on port 5499 with all migrations and seeds applied; the seed
-  was also re-applied to confirm idempotency.
-- Small fixes in `app/auth.py` found by ruff: missing `asyncpg` import on a return
-  annotation (only worked because 3.14 evaluates annotations lazily), unused import,
-  exception chaining, narrowed the signup duplicate-email catch to `UniqueViolationError`.
+- `app/harada_export.py` — pure payload builder (`build_payload`, `goal_dict`), atomic
+  `write`, `export_target`. Schema 1, documented in **`docs/HARADA_BOARD_CONTRACT.md`**.
+- `app/harada.py` — `board_payload` (the SQL moved here from the router), `set_goal`, and
+  `_export` called at the end of `recompute`, `set_focus`, `set_manual_state`, `set_goal`.
+  Export failure is logged and never blocks the change.
+- `app/harada_api.py` — thin now: validation + delegation; `GET /api/harada` returns the
+  contract payload (new keys: `schema`, `board`, `generated_at`, `focus{}`, `totals{}`,
+  per-theme `slot`, per-action `routine_key` and `updated_at`; `goal` gains
+  `cycle_end`, `cycle_day`, `days_left` and drops `user_id`).
+- `app/config.py`, `.env.example` — `HARADA_EXPORT_PATH`, `HARADA_EXPORT_USER_ID`.
+- `templates/dashboard.html` — the board: 9×9 grid from `docs/harada-board.html`, goal /
+  cycle form (with *restart cycle*), progress panel, focus list with the 3–5 prompt and a
+  disabled Focus button at the cap (server still 409s), detail panel with `measure`,
+  Rescore button, *Start today's session*. Expired sessions bounce to `/login` (the API
+  still answers a 303, see *Deferred*). Vanilla JS, no innerHTML with user text.
+- `templates/login.html` — unused HTMX script removed.
+- Tests: 180 passing (`tests/test_harada_export.py` new; export + goal cases added to
+  `tests/test_harada_db.py`). Ran against a throwaway `postgres:16` on port 5499 with all
+  migrations and seeds applied.
+- Docs: README (board section, mirror, env), `HARADA_INTEGRATION.md` §7/§8 notes,
+  `CLAUDE.md` conventions and status.
 
-## Review outcome (code-reviewer + security-reviewer agents, 2026-09-13)
+## Review outcome (code-reviewer agent, 2026-09-13)
 
-No CRITICAL findings. Fixed in this branch: the eval model's `lesson_score` is now clamped to
-0–1 (a percentage like 95 would have marked the lesson passed and made the focus picker skip
-it forever); `POST /api/harada/goal` takes `restart_cycle=true` to reset `cycle_start`;
-routine-key and tag regexes anchor with `\Z` (Python's `$` admits a trailing newline);
-goal/cycle text capped at 2000 chars; vocab strings from the model capped at 200 chars and
-blank ones dropped; a seed test pins every metric window under `FACT_SESSIONS`/`FACT_DAYS`.
-Left as LOW: no per-user rate limit on `/recompute`; `clean_tag` accepts any slug rather
-than only the 8 seeded clusters (off-list tags are stored but never scored).
+APPROVE, no CRITICAL/HIGH. Two MEDIUM findings, both fixed in this branch: the export
+file write now runs in a thread (`asyncio.to_thread`) instead of blocking the event loop,
+and an unpinned export refuses to write once a second `users` row exists (test:
+`test_unpinned_export_stops_once_a_second_learner_exists`). XSS surface checked clean
+(`textContent` only, Jinja autoescape, no `|safe`).
 
-## Unverified — do this first next session
+## Verified in a browser (2026-09-13, throwaway DB, fake API key)
 
-1. **Run a real session.** Copy `.env.example` → `.env`, start Postgres, apply migrations
-   and seeds, sign up, set 3 focus cells via the API, start a session, send a few turns,
-   close it, then `GET /api/harada` and confirm cells moved. Watch for
-   `anthropic` 1.5.0 behaviour (requirements say `>=0.40`; pin it once confirmed).
-2. Check `response.usage.cache_read_input_tokens` on a turn. The static prompt is ~650
-   tokens and Haiku 4.5 needs a 4096-token prefix to cache, so it is almost certainly 0.
-   The fix is a cache breakpoint on the last transcript message, not on the system prompt.
+Sign up → board renders all 64 cells → save goal (export file written, cycle day 1 of 90)
+→ focus a computed cell (ring + focus list + `focus.count` 1 in the file) → set a manual
+cell to done (green, theme 1/8, `totals.done` 1 in the file) → no console errors.
+**Not verified:** the phone-width layout (`@media(max-width:700px)` hides labels and
+shrinks cells) — the harness could not resize the viewport. Check it on a real phone.
 
-## Next phase: board UI (Harada step 4) and check sheet (step 5)
+## Timezone fix (found while opening the PR)
 
-- Port `docs/harada-board.html` into `templates/dashboard.html`. Replace the hard-coded
-  `THEMES` array with `fetch('/api/harada')`; cell click → `POST action/{id}/focus` for
-  computed cells, cycle state for `is_manual` cells; show `measure` in the detail panel.
-  Show `focus_count / max_focus` and refuse a 6th focus client-side too (server already 409s).
-- "Today" view: routine checkboxes for the `routine_days` keys of the current focus cells
-  (`key` lives in each action's `metric_args` — expose it in the board JSON), posting to
-  `/api/harada/routine`. One button: *Start session on &lt;focus action&gt;*.
-- A "set your 3–5 focus cells" prompt when `focus_count < min_focus`.
-- Drop the unused HTMX `<script>` from `templates/login.html`.
+`test_set_goal_round_trips_and_restart_resets_the_cycle` failed after 20:00 local: Postgres
+evaluated `CURRENT_DATE` in the container's UTC while the app used the OS-local date, so
+goal `cycle_start`, `usage_ledger.usage_date`, `routine_log.log_date` and SRS due dates
+were a day off from what the app computed every evening. Fix: `APP_TIMEZONE` (config,
+default UTC; `.env.example` sets America/New_York) is applied to every pooled connection
+and is the only zone `app/clock.py` uses; `date.today()` is banned in `app/` by
+`tests/test_clock.py`. `tzdata` added to requirements for Windows.
 
-Then step 6 (cycle close): at `cycle_start + cycle_days`, recompute, one Sonnet review call
-over the cycle's summaries, carry incomplete focus cells forward, ask for new focus cells,
-reset `cycle_start`. Also the natural home for the level-change job.
+## Unverified — still first next session
 
-## Deferred (Phase 0 items Yanni chose to skip for now)
+1. **Run a real session against the Claude API.** Same list as before: fill `.env`, start
+   Postgres, apply migrations and seeds, sign up, focus 3 cells on the board, start a
+   session, send turns, close it, confirm cells moved on the board and in the export file.
+2. Check `response.usage.cache_read_input_tokens` on a turn (prompt is probably under
+   Haiku's caching minimum; the fix is a breakpoint on the last transcript message).
 
-- Model IDs: `.env.example` pins a date-suffixed Haiku id; current ids are undated
-  (`claude-haiku-4-5`). Sonnet 5 (`claude-sonnet-5`) is now cheaper than Sonnet 4.6 for eval.
-  Opus 5 would tutor noticeably better per turn; cost call is Yanni's.
-- `require_user` raises a 303 for API routes; fetch follows it to HTML and `r.json()` fails.
+## Next phase: cycle close (Harada step 6)
+
+At `cycle_start + cycle_days` (the board already shows "cycle ended N days ago"):
+recompute, one Sonnet call over the cycle's `summary_text` + `error_patterns` for a review,
+mark newly-done cells, carry incomplete focus cells forward, ask for the next 3–5 focus
+cells pre-ranked by weakest theme, write the new `cycle_text`, reset `cycle_start`
+(`set_goal(..., restart_cycle=True)` already does the last two). Also the natural home for
+the level-change job. Store the review (`harada_reviews` table, or reuse `harada_goals`
+with a history) so the export can carry `last_review`.
+
+## Tracker side (not this repo)
+
+Phase 6 in `tracker/docs/implementation.md`: read `HARADA_EXPORT_PATH` (bind-mount
+read-only like `data/*.json`), seed the Greek board's cells as `linked` rows keyed by
+`actions[].id`, map habits to `routine_key`s, show the mirror on `/boards/greek`. Follow the
+consumer rules in `docs/HARADA_BOARD_CONTRACT.md`.
+
+## Deferred (unchanged from the previous handoff)
+
+- Model IDs in `.env.example` are date-suffixed; current ids are undated. Sonnet 5 is now
+  cheaper than Sonnet 4.6 for eval; Opus 5 tutors better per turn. Cost call is Yanni's.
+- `require_user` raises a 303 for API routes; the dashboard works around it client-side.
   Return 401 for `/api/*`.
 - `COOKIE_SECRET` is required by config but unused (`itsdangerous` too).
 - No rate limiting on `/login` and `/signup`; no email verification. Fine for one user.
-- `profiles.streak_count` / `last_active_date` are never written. Per-turn `error_tags` and
-  `level_signal`, and the close-time `level_recommendation`, are parsed and dropped.
+- `profiles.streak_count` / `last_active_date` never written; per-turn `error_tags`,
+  `level_signal` and close-time `level_recommendation` parsed and dropped.
 - No `docker-compose.yml`; README setup is manual psql.
-- No HTTP-level tests of the routers (needs an auth cookie fixture); engine is tested at the
-  function level.
-- Voice (Phase 2) and everything under "audio-shaped cells" above.
+- No HTTP-level tests of the routers (needs an auth cookie fixture).
+- No per-user rate limit on `/recompute`; `clean_tag` accepts any slug.
+- Voice and the 24 audio-shaped manual cells.
 
 ## How to run the tests
 
-See README → Development. Short version: `pytest` for unit tests; export
-`TEST_DATABASE_URL` pointing at a seeded database to include `tests/test_harada_db.py`.
+`pytest` for unit tests; `ruff check app tests`. For the database tests:
+
+```bash
+docker run -d --name greek-tutor-test-db -e POSTGRES_USER=tutor -e POSTGRES_PASSWORD=tutor \
+  -e POSTGRES_DB=greektutor_test -p 127.0.0.1:5499:5432 postgres:16
+docker exec greek-tutor-test-db psql -U tutor -d greektutor_test -c "CREATE EXTENSION IF NOT EXISTS citext;"
+for f in migrations/001_schema.sql migrations/002_tutor_turns.sql migrations/003_harada.sql \
+         seed/lessons_a1.sql seed/harada.sql; do
+  docker exec -i greek-tutor-test-db psql -v ON_ERROR_STOP=1 -U tutor -d greektutor_test < "$f"
+done
+TEST_DATABASE_URL=postgresql://tutor:tutor@127.0.0.1:5499/greektutor_test pytest
+```

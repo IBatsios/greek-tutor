@@ -7,7 +7,10 @@ _pool: asyncpg.Pool | None = None
 
 async def init_pool() -> None:
     global _pool
-    _pool = await asyncpg.create_pool(config.DATABASE_URL, min_size=2, max_size=10)
+    _pool = await asyncpg.create_pool(
+        config.DATABASE_URL, min_size=2, max_size=10,
+        server_settings={"timezone": config.APP_TIMEZONE},  # same calendar as app/clock.py
+    )
 
 
 async def close_pool() -> None:

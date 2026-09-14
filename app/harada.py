@@ -1,20 +1,23 @@
 """Harada engine: load facts from Postgres, rescore the 64 cells, pick the session focus.
 
 Scoring itself is pure and lives in ``harada_metrics``; this module is the I/O
-around it plus the two business rules that must hold regardless of UI:
-at most MAX_FOCUS focus cells, and only manual cells can be set by hand.
+around it plus the business rules that must hold regardless of UI:
+at most MAX_FOCUS focus cells, only manual cells can be set by hand, and every
+board mutation refreshes the export file the tracker mirrors (``harada_export``).
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import asyncpg
 
+from . import clock, config, harada_export
 from . import harada_metrics as hm
 from .db import pool
 
@@ -38,6 +41,60 @@ class NotManualError(ValueError):
 def as_json(value: Any) -> Any:
     """asyncpg hands JSONB back as text unless a codec is installed; accept both."""
     return value if isinstance(value, (dict, list)) else json.loads(value)
+
+
+# --- board payload + export -------------------------------------------------
+
+_BOARD_SQL = """
+SELECT t.id AS theme_id, t.slug, t.name_en, t.name_el,
+       a.id, a.slot, a.label, a.measure, a.metric_kind, a.metric_args,
+       COALESCE(ua.state, 'not_started') AS state,
+       COALESCE(ua.progress, 0) AS progress,
+       COALESCE(ua.is_focus, false) AS is_focus,
+       ua.updated_at
+FROM harada_actions a
+JOIN harada_themes t ON t.id = a.theme_id
+LEFT JOIN user_harada_actions ua ON ua.action_id = a.id AND ua.user_id = $1
+ORDER BY t.id, a.slot
+"""
+_GOAL_SQL = "SELECT * FROM harada_goals WHERE user_id = $1"
+
+
+async def board_payload(user_id: int) -> dict[str, Any]:
+    """The whole board for one learner: what GET /api/harada and the export file return."""
+    async with pool().acquire() as conn:
+        goal = await conn.fetchrow(_GOAL_SQL, user_id)
+        rows = await conn.fetch(_BOARD_SQL, user_id)
+    return harada_export.build_payload(
+        goal, rows, min_focus=MIN_FOCUS, max_focus=MAX_FOCUS, now=datetime.now(UTC),
+    )
+
+
+async def _other_learners_exist(user_id: int) -> bool:
+    return await pool().fetchval("SELECT EXISTS (SELECT 1 FROM users WHERE id <> $1)", user_id)
+
+
+async def _export(user_id: int) -> None:
+    """Refresh the mirror file after a board change. Best effort: never fails the change.
+
+    The file holds one learner's board. Unpinned, it is only written while this is
+    the sole account; otherwise one learner's goal and progress would land in a file
+    another learner's tracker reads.
+    """
+    target = harada_export.export_target(user_id=user_id)
+    if target is None:
+        return
+    try:
+        if config.HARADA_EXPORT_USER_ID is None and await _other_learners_exist(user_id):
+            log.warning(
+                "harada: export skipped — more than one learner exists; "
+                "set HARADA_EXPORT_USER_ID to the learner whose board %s should hold", target,
+            )
+            return
+        payload = await board_payload(user_id)
+        await asyncio.to_thread(harada_export.write, payload, target)
+    except Exception:
+        log.exception("harada: export to %s failed for user %s", target, user_id)
 
 
 # --- facts ------------------------------------------------------------------
@@ -82,7 +139,7 @@ async def _session_facts(conn: asyncpg.Connection, user_id: int) -> tuple[hm.Ses
 
 async def load_facts(user_id: int) -> hm.Facts:
     """Everything the scorers need for one learner, in a handful of queries."""
-    today = date.today()
+    today = clock.today()
     since = today - timedelta(days=FACT_DAYS)
     async with pool().acquire() as conn:
         lessons = await conn.fetch(
@@ -156,6 +213,7 @@ async def recompute(user_id: int) -> int:
         rows.append((user_id, a["id"], progress, hm.state_for(progress)))
     if rows:
         await pool().executemany(_UPSERT_PROGRESS, rows)
+    await _export(user_id)
     return len(rows)
 
 
@@ -301,6 +359,26 @@ async def set_focus(user_id: int, action_id: int, on: bool) -> None:
                ON CONFLICT (user_id, action_id) DO UPDATE SET is_focus = EXCLUDED.is_focus""",
             user_id, action_id, on,
         )
+    await _export(user_id)
+
+
+async def set_goal(user_id: int, goal_text: str, cycle_text: str, cycle_days: int,
+                   restart_cycle: bool) -> dict[str, Any]:
+    """Upsert the central goal and cycle; restart_cycle resets cycle_start to today."""
+    row = await pool().fetchrow(
+        """INSERT INTO harada_goals (user_id, goal_text, cycle_text, cycle_days)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (user_id) DO UPDATE SET
+             goal_text = EXCLUDED.goal_text, cycle_text = EXCLUDED.cycle_text,
+             cycle_days = EXCLUDED.cycle_days,
+             cycle_start = CASE WHEN $5 THEN CURRENT_DATE ELSE harada_goals.cycle_start END
+           RETURNING *""",
+        user_id, goal_text, cycle_text, cycle_days, restart_cycle,
+    )
+    await _export(user_id)
+    goal = harada_export.goal_dict(row, today=clock.today())
+    assert goal is not None  # RETURNING * on an upsert always yields the row
+    return goal
 
 
 async def set_manual_state(user_id: int, action_id: int, state: str) -> None:
@@ -319,3 +397,4 @@ async def set_manual_state(user_id: int, action_id: int, state: str) -> None:
              state = EXCLUDED.state, progress = EXCLUDED.progress, updated_at = now()""",
         user_id, action_id, state, MANUAL_PROGRESS[state],
     )
+    await _export(user_id)

@@ -2,8 +2,10 @@
 
 Personal Modern Greek tutor: FastAPI + asyncpg/PostgreSQL + Claude API, with a
 Harada-method progress board as the model of the learner. Single learner (Yanni)
-first; multi-user schema retained. Plan of record: `docs/HARADA_INTEGRATION.md`.
-Pick up from the newest file in `docs/handoff-items/`.
+first; multi-user schema retained. Spec: `docs/HARADA_INTEGRATION.md`. Requirement:
+the board prototype (`docs/harada-board.html`); gaps vs code: `docs/REQUIREMENTS_TRACE.md`.
+**Start every session at `docs/handoff-items/00-ROADMAP.md`** — take the first stage not
+marked `done`, follow its file, and write its *Session notes* before stopping.
 
 ## Stack and layout
 
@@ -35,9 +37,10 @@ Pick up from the newest file in `docs/handoff-items/`.
 - The daily routine check sheet is the **tracker's** UI, not this app's. Do not
   build a second one here.
 - Branch per change (`feature/…`, `fix/…`), conventional commits, never commit `.env`.
-- `ruff check app tests` and `pytest` must pass before a merge request.
+- `ruff check app tests scripts` and `pytest` must pass before a merge request.
+- When a stage changes how a board cell is measured, update `docs/REQUIREMENTS_TRACE.md`.
 
-## Status snapshot (2026-09-13)
+## Status snapshot (2026-09-26)
 
 Phase 1 text tutor is written; Harada steps 1–4 are implemented and tested
 (schema, seed, recompute at session close, focus-driven session start, CURRENT

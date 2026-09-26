@@ -112,6 +112,9 @@ it's measured: `docs/harada-board.html` (open it in a browser). Where the code d
 
 ## Run it (Docker)
 
+> Step-by-step for all four ways to run it (Docker or Python × API key or subscription),
+> with checks and troubleshooting: **[`RUNBOOK.md`](RUNBOOK.md)**.
+
 ```bash
 cp .env.example .env
 #   POSTGRES_PASSWORD   openssl rand -hex 24
@@ -254,6 +257,7 @@ pytest                                          # DB tests skip unless TEST_DATA
 
 | File | What it's for |
 |---|---|
+| `RUNBOOK.md` | How to run it: Docker or Python, API key or subscription |
 | `docs/handoff-items/00-ROADMAP.md` | **Start here** — staged plan, one file per coding session |
 | `docs/REQUIREMENTS_TRACE.md` | Board vs code, cell by cell |
 | `docs/HARADA_INTEGRATION.md` | The spec for the progress engine |

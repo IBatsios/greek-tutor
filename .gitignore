@@ -13,3 +13,6 @@ __pycache__/
 # OS / editor
 .DS_Store
 Thumbs.db
+
+# Board mirror written by the container (HARADA_EXPORT_PATH)
+export/

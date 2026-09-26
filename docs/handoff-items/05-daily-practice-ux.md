@@ -21,13 +21,13 @@ next review further out (interval × ease); each miss resets it to tomorrow and 
 ### A. Review page `/review` — no AI
 - [ ] `GET /api/review/next?limit=20` → due cards (`user_vocab` due ≤ today, ordered by due date then ease). Direction alternates: Greek→English (recognition) and English→Greek (production).
 - [ ] `POST /api/review/answer` → grade. English→Greek compares after Unicode NFC + lowercase; an answer correct except for accents is "almost" (shown, counts as incorrect for SRS, but tagged `stress_accent` in a review log). Greek→English: self-graded (show answer, "I knew it / I didn't").
-- [ ] Writes via `srs.apply_vocab_event(..., source='review')`. When the queue hits zero, stage 02's `srs_cleared` hook fires.
+- [ ] Writes via `srs.apply_vocab_event(..., source='review')`. When the queue hits zero, stage 02 records the day as cleared (cell 1.1).
 - [ ] Keyboard-first: Enter = check, 1/2 = self-grade.
 
 ### B. Leech queue
 - [ ] Leech = `srs_ease ≤ 1.5` or `times_seen − times_correct ≥ 3`. `/review?leeches=1` shows them with the full example sentence and mnemonic field.
-- [ ] Finishing a leech round writes `routine_log.checks.leech_review = true` — cell 1.8 becomes what the board says.
-- [ ] Today view shows "n leeches — weekly review due" on the day you choose (default Sunday).
+- [ ] Finishing a leech round records the date in a tutor-owned table (not `routine_log`, which the tracker feeds); cell 1.8 moves to a computed metric over it — what the board says ("surfaced every Sunday").
+- [ ] The board header shows "n leeches — weekly review due" on the day you choose (default Sunday).
 
 ### C. Session page `/practice`
 - [ ] Header: focus action + lesson topic; objective progress bar from `objective_progress`.

@@ -1,7 +1,8 @@
 # Requirements trace — `greek-harada-board.html` vs the code
 
-**Date:** 2026-09-26 · **Board revision:** commit `761d74f` (root `greek-harada-board.html`,
-byte-identical to `docs/harada-board.html`) · **Code revision:** `main` @ `761d74f`
+**Date:** 2026-09-26 · **Board revision:** `docs/harada-board.html` (root `greek-harada-board.html`
+is a byte-identical copy) · **Code revision:** `feature/harada-board-ui` @ `fb07513` + Docker/roadmap.
+§1 and §3 were revised the same day after rebasing onto the board-UI branch.
 
 The board is the requirement. This file says, for every board feature and every one of the
 64 cells, whether the code does what the board says, and which roadmap stage closes the gap.
@@ -14,8 +15,8 @@ Stage numbers refer to `docs/handoff-items/00-ROADMAP.md`.
 | Goal, 8 themes, 64 action **labels** | Match. 64/64 labels identical; one cosmetic change (7.3 says "error patterns", not the column name `error_patterns`). |
 | Theme order and grid positions | Match. Theme ids 0–7 are the board's `THEMES` order; slot = position within the block. |
 | **How cells are measured** | 31 match the board; 9 are measured differently from what the board says; 24 are `manual` where the board describes a measurement the app cannot take yet. |
-| Board **UI** | Not built. The API behind it exists (`/api/harada/*`); the dashboard is still a placeholder. |
-| Daily routine check sheet | API exists; no UI. 5 of the 6 daily items have keys; 10 more keys exist in the seed with no place on the check sheet. |
+| Board **UI** | Built on `/` (`feature/harada-board-ui`): grid, goal/cycle, focus, detail panel, isolation. Left: print, download, phone check (stage 03). |
+| Daily routine check sheet | **Lives in the tracker by decision** (2026-09-13). Write path `POST /api/harada/routine` exists, but nothing feeds it from the tracker yet, so the 15 routine cells read 0 (stage 04). |
 | 90-day cycle | Goal/cycle fields stored; nothing happens at day 90. |
 
 The single most important finding: **24 of 64 cells can only move by hand, and the text-only
@@ -29,21 +30,20 @@ Status key: ✅ matches the board · ⚠️ measured, but not the way the board 
 
 | Board feature | In code? | Notes / gap | Stage |
 |---|---|---|---|
-| 9×9 mandala: goal centre, 8 themes around it, each theme mirrored in its block | ❌ | `templates/dashboard.html` is a greeting and one button | 03 |
-| Central goal text (editable) | API ✅ UI ❌ | `POST /api/harada/goal` | 03 |
-| Current 90-day target text | API ✅ UI ❌ | `cycle_text` | 03 |
-| Cycle start date + "Day N of 90 · M left" | API ✅ UI ❌ | Prototype hard-codes 90; schema has `cycle_days` — UI must read it | 03 |
-| "Cycle ended N days ago — set a new target" | ❌ | Needs cycle close | 07 |
-| Progress: % of 64 done, done count, in-progress count, bar | API partial | API gives per-theme `done`; no in-progress count. Spec §9 says manual cells must not inflate % without a flag — decide in 03 | 03 |
-| Theme rail: dot, name, mini bar, x/8 | API ✅ UI ❌ | | 03 |
-| Click theme → isolate block; Esc clears; "Show all" | ❌ | Pure client-side | 03 |
-| Click cell → cycle not started → in progress → done; shift-click back | ⚠️ by design | In the app only `manual` cells take a hand-set state (409 otherwise). Computed cells toggle **focus** instead | 03 |
-| Detail panel: theme, action, "Measured by", state buttons | API ✅ UI ❌ | `measure` is in the board JSON | 03 |
-| "Keep 3–5 actions in progress" rule | ✅ stronger | Enforced server-side as max 5 `is_focus` (409). Minimum 3 is a hint only | 03/04 |
-| Daily routine check sheet (6 items) | API ✅ UI ❌ | See §3 | 04 |
-| Export progress (JSON) | ❌ | Prototype needed it because state was in memory. The DB is now the source of truth; `GET /api/harada` is the export. Keep a download button for backups | 03 |
-| Import progress | ❌ won't do | Server-authoritative data; importing would overwrite computed cells. One-off migration of a prototype JSON file is a script, not a feature | — |
-| Print layout | ❌ | Copy the prototype's `@media print` block | 03 |
+| 9×9 mandala: goal centre, 8 themes around it, each theme mirrored in its block | ✅ | `templates/dashboard.html` from `GET /api/harada` | — |
+| Central goal text, 90-day target, cycle length, restart | ✅ | Goal/cycle form; `cycle_days` honoured (not hard-coded 90) | — |
+| "Day N of M · K left" / "Cycle ended N days ago" | ✅ | From `goal.cycle_day` / `days_left` | — |
+| Actually closing the cycle (review, new focus) | ❌ | | 07 |
+| Progress: % done, done / in-progress counts, bar | ✅ partial | `totals` carries computed vs manual counts; confirm the headline % doesn't mix self-reported with measured (spec §9) | 03 |
+| Theme rail with x/8; click theme → isolate; Esc; Show all | ✅ | | — |
+| Click cell → cycle state | ⚠️ by design | Click selects; the detail panel holds Focus/Unfocus and (manual only) the three state buttons. Computed cells can't be hand-set (409) | — |
+| Detail panel: theme, action, "Measured by" | ✅ | | — |
+| "Keep 3–5 actions in progress" rule | ✅ stronger | Max 5 enforced server-side; Focus button disabled at the cap | — |
+| Daily routine check sheet | ➜ tracker | Decision 2026-09-13: the tracker's Today page. Inbound feed missing — see §3 | 04 |
+| Export progress (JSON) | ✅ different | Versioned export file for the tracker (`HARADA_EXPORT_PATH`, schema 1). A manual download button is still missing | 03 |
+| Import progress | won't do | The DB is the source of truth | — |
+| Print layout | ❌ | Port the prototype's `@media print` | 03 |
+| Phone layout | unverified | `@media(max-width:700px)` exists; never seen on a device | 03 |
 | Footer promise: every action resolves to data already in the schema | ⚠️ | True for 40 cells. 24 are manual; see §2 | 02, 08–11 |
 
 ## 2. The 64 cells
@@ -59,7 +59,7 @@ Status key: ✅ matches the board · ⚠️ measured, but not the way the board 
 | 0.3 | Vowel digraphs αι ει οι ου | A1-1 objective ≥0.9 | A1-1 lesson ≥0.9 | ✅ | A1-1 objectives list αι/ει/ου — add οι to the lesson seed → 02 |
 | 0.4 | Clusters μπ ντ γκ τζ | tutor pronunciation check 10/10 | manual | ✋ | Needs voice → 11 |
 | 0.5 | τόνος on 50 words | stress errors <5% of turns | pattern absent 5 sessions | ⚠️ | Per-turn `error_tags` are parsed then dropped, so a per-turn rate is impossible → 02 |
-| 0.6 | Shadow 5 min daily | check sheet 6/7 | `routine_days` shadow_5 6/7 | ✅ | Needs the check sheet UI → 04 |
+| 0.6 | Shadow 5 min daily | check sheet 6/7 | `routine_days` shadow_5 6/7 | ✅ | Tracker feed → 04 |
 | 0.7 | Record a paragraph vs native | monthly recording, self-scored | manual | ✋ | Recording store → 11 |
 | 0.8 | δ/θ, γ before ε/ι | minimal-pair drill 18/20 | manual | ✋ | Needs TTS audio → 10 |
 
@@ -93,9 +93,9 @@ Status key: ✅ matches the board · ⚠️ measured, but not the way the board 
 
 | # | Action | Board says | Code does | St. | Gap → stage |
 |---|---|---|---|---|---|
-| 3.1 | 10 min audio daily | check sheet 6/7 | `listening_10` 6/7 | ✅ | UI → 04 |
-| 3.2 | Radio/podcast 3×/week | check sheet | `radio` 3/7 | ✅ | Not on the prototype's check sheet → 04 |
-| 3.3 | Series episode weekly | weekly log | `episode` 1/7 | ✅ | Weekly items need a place in the UI → 04 |
+| 3.1 | 10 min audio daily | check sheet 6/7 | `listening_10` 6/7 | ✅ | Tracker feed → 04 |
+| 3.2 | Radio/podcast 3×/week | check sheet | `radio` 3/7 | ✅ | Tracker feed → 04 |
+| 3.3 | Series episode weekly | weekly log | `episode` 1/7 | ✅ | Tracker feed → 04 |
 | 3.4 | Transcribe 60 s | tutor-graded ≥0.8 | manual | ✋ | Graded task + audio → 09/10 |
 | 3.5 | Numbers dictation 20/20 | A1-15 objective; 18/20 | A1-15 lesson ≥0.9 | ⚠️ | Text lesson ≠ dictation; real dictation needs TTS → 10 |
 | 3.6 | News gist 4/5 | tutor comprehension check | manual | ✋ | → 10 |
@@ -110,7 +110,7 @@ Status key: ✅ matches the board · ⚠️ measured, but not the way the board 
 | 4.2 | Narrate day, past tense | A1-22 then A2 aorist | A1-22 ≥0.85 | ✅ | A2 half → 12 |
 | 4.3 | Order, shop, directions | A1-8/14/15 role-plays | same lessons ≥0.85 | ✅ | Typed, not spoken, until 11 |
 | 4.4 | Describe a photo 90 s | timed drill, no pause >4 s | manual | ✋ | → 11 |
-| 4.5 | Weekly native conversation | weekly log | `native_convo` 1/7 | ✅ | UI → 04 |
+| 4.5 | Weekly native conversation | weekly log | `native_convo` 1/7 | ✅ | Tracker feed → 04 |
 | 4.6 | English fillers to zero | English-token count = 0 | same metric as 3.7 | ✅ | |
 | 4.7 | Self-correct gender | self-corrections ≥3/session | manual | ✋ | Add `self_corrections` to the turn contract → 02 |
 | 4.8 | 10-min unprepared conversation | THE GOAL — exit check | manual | ✋ | Always a human judgement; cycle review asks for it → 07 |
@@ -119,13 +119,13 @@ Status key: ✅ matches the board · ⚠️ measured, but not the way the board 
 
 | # | Action | Board says | Code does | St. | Gap → stage |
 |---|---|---|---|---|---|
-| 5.1 | Read signs aloud | daily habit | `signs_aloud` 6/7 | ✅ | UI → 04 |
+| 5.1 | Read signs aloud | daily habit | `signs_aloud` 6/7 | ✅ | Tracker feed → 04 |
 | 5.2 | A1 graded reader | logged completion | manual | ✋ | Reading module logs completions → 08 |
-| 5.3 | Headlines daily | check sheet | `headlines` 6/7 | ✅ | UI → 04 |
+| 5.3 | Headlines daily | check sheet | `headlines` 6/7 | ✅ | Tracker feed → 04 |
 | 5.4 | Children's book | logged completion | manual | ✋ | → 08 |
-| 5.5 | Read aloud 5 min | check sheet 6/7 | `read_aloud_5` 6/7 | ✅ | UI → 04 |
+| 5.5 | Read aloud 5 min | check sheet 6/7 | `read_aloud_5` 6/7 | ✅ | Tracker feed → 04 |
 | 5.6 | 10 unknown words per text into SRS | `vocab_events` sourced from reading | manual | ✋ | Tap-to-add in reader writes a `source` → 08 |
-| 5.7 | Greek subtitles | weekly log | `greek_subs` 1/7 | ✅ | UI → 04 |
+| 5.7 | Greek subtitles | weekly log | `greek_subs` 1/7 | ✅ | Tracker feed → 04 |
 | 5.8 | A2 story, <10 lookups | A2 gate | manual | ✋ | Reader counts lookups → 08/12 |
 
 ### 6 · Writing
@@ -138,7 +138,7 @@ Status key: ✅ matches the board · ⚠️ measured, but not the way the board 
 | 6.4 | 100 words about yourself | tutor-graded ≥0.8 | manual | ✋ | Graded writing tasks → 09 |
 | 6.5 | Message a real Greek speaker | logged once | manual | ✋ | Stays manual |
 | 6.6 | Rewrite 5 flagged errors | `error_patterns` worked per session | manual | ✋ | Error-rewrite drill at session end → 09 |
-| 6.7 | Greek line in journal | check sheet | `journal_line` 6/7 | ✅ | Overlaps 6.1; consider merging → 04 |
+| 6.7 | Greek line in journal | check sheet | `journal_line` 6/7 | ✅ | Overlaps 6.1 — merge the tracker habits or the cells → 04 |
 | 6.8 | 200-word past narrative | A2 gate | manual | ✋ | → 09/12 |
 
 ### 7 · Habit & Environment
@@ -150,28 +150,34 @@ Status key: ✅ matches the board · ⚠️ measured, but not the way the board 
 | 7.3 | Phone/OS in Greek | one-time | manual | ✋ | Stays manual |
 | 7.4 | Weekly error review | weekly ritual | `weekly_review` 1/7 | ✅ | A review screen that writes the check → 07 |
 | 7.5 | Visible 90-day target | the cycle field | manual | ✋ | Could auto-score "cycle_text set and cycle not expired" → 07 |
-| 7.6 | Greek playlist | passive, daily | `playlist` 5/7 | ✅ | UI → 04 |
+| 7.6 | Greek playlist | passive, daily | `playlist` 5/7 | ✅ | Tracker feed → 04 |
 | 7.7 | 20 sticky-note labels | one-time | manual | ✋ | Stays manual |
 | 7.8 | Monthly self-assessment recording | 12 a year | manual | ✋ | Recording store → 11 |
 
 Cell numbers here are 1-based within each theme, as the board displays them; the database
 `slot` is 0-based (board cell 0.1 = theme 0, slot 0).
 
-## 3. Daily routine check sheet
+## 3. Daily routine check sheet (owned by the tracker)
 
-| Prototype item | Seed key | Cell(s) it moves |
-|---|---|---|
-| Clear the SRS due queue | `srs_cleared` | 1.1 |
-| One tutor session (45 min) | — (read from `usage_ledger`) | 7.1, 7.2 |
-| 10 min listening, no subtitles | `listening_10` | 3.1 |
-| Read aloud for 5 minutes | `read_aloud_5` | 5.5 |
-| Three sentences written in Greek | `three_sentences` | 6.1 |
-| Shadow 5 minutes of native audio | `shadow_5` | 0.6 |
+The prototype's six daily items, and where each one's tick must come from:
 
-Keys in the seed that **the prototype's check sheet has no place for** — without UI for them,
-10 cells can never move: `radio`, `episode`, `native_convo`, `signs_aloud`, `headlines`,
-`greek_subs`, `journal_line`, `leech_review`, `weekly_review`, `playlist`. Stage 04 adds a
-"This week" list beside "Today" and derives both from the seed rather than hard-coding them.
+| Prototype item | Seed key | Cell(s) it moves | Source after the roadmap |
+|---|---|---|---|
+| Clear the SRS due queue | `srs_cleared` | 1.1 | **This app** — computed from the SRS queue (stage 02); the key leaves the export |
+| One tutor session (45 min) | — | 7.1, 7.2 | This app — study minutes (stage 02) |
+| 10 min listening, no subtitles | `listening_10` | 3.1 | Tracker habit |
+| Read aloud for 5 minutes | `read_aloud_5` | 5.5 | Tracker habit |
+| Three sentences written in Greek | `three_sentences` | 6.1 | Tracker habit |
+| Shadow 5 minutes of native audio | `shadow_5` | 0.6 | Tracker habit |
+
+Keys the prototype's sheet had no place for; the tracker needs a habit for each:
+`radio`, `episode`, `native_convo`, `signs_aloud`, `headlines`, `greek_subs`, `journal_line`,
+`playlist`. Two move to this app because the activity happens here: `leech_review` (stage 05)
+and `weekly_review` (stage 07).
+
+**The gap:** the board contract says the tracker never writes back, and
+`POST /api/harada/routine` needs a browser session. Until stage 04 adds an inbound path, every
+tracker-owned routine cell reads 0 no matter what you tick.
 
 ## 4. Defects found during this review (not board mismatches)
 
@@ -182,6 +188,7 @@ Keys in the seed that **the prototype's check sheet has no place for** — witho
 | D3 | `error_absent` treats "not practised" as "clean" | Cells 0.2, 0.5, 2.4 go green without evidence | 02 |
 | D4 | No controlled error vocabulary; seed matches substrings of free-text slugs | Cells may never match what the eval model writes | 02 |
 | D5 | One lesson score satisfies several cells (A1-1 → 0.1 and 0.3; A1-15 → 3.5, 4.3, 6.2) | Board progress moves in jumps | accepted; note in UI |
-| D6 | Duplicate board file (`greek-harada-board.html` = `docs/harada-board.html`) | Two copies will drift | 01 — keep one |
+| D6 | Duplicate board file (`greek-harada-board.html` = `docs/harada-board.html`) | Two copies will drift | 03 — keep one |
+| D9 | Tracker ticks have no path into `routine_log` | 15 routine cells stuck at 0 | 04 |
 | D7 | `require_user` returns 303 to API callers | `fetch().json()` fails on expired sessions | 01 |
 | D8 | Session never "exercises" a vocab-cell focus when the model ignores the focus block | Focus is a prompt hint, not enforced | 02 (measure) / 13 (evals) |

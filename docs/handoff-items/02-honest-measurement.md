@@ -56,7 +56,7 @@ two directions:
 
 ### F. Streak and automatic checks
 - [ ] On the first activity of a day, update `profiles.last_active_date` and `streak_count` (reset to 1 after a gap ≥2 days — Harada's "never miss two", not "never miss one").
-- [ ] When the SRS due queue reaches zero (after a vocab event), upsert `routine_log.checks.srs_cleared = true` for today. Cell 1.1 becomes what the board says: computed.
+- [ ] Cell 1.1 (clear the SRS queue daily) becomes **computed here**, not a tracker tick: record `srs_daily (user_id, day, cleared bool)` whenever the due count reaches zero, and score it as a `session_metric` field `srs_cleared_days {"days":7,"window":7}`. Its `routine_key` disappears from the export — tell the tracker side (the contract allows removing a value, not a key).
 - [ ] Vocab `pos`: add `"pos"` to `vocab_events`; `srs.apply_vocab_event` writes it on insert. New `vocab_form` kind, or a `vocab_count` variant, for cell 1.5: share of nouns stored with their article (`ο/η/το/οι/τα …`) ≥0.95 over ≥50 nouns. Leave 1.6 manual until stage 05.
 - [ ] Add `οι` to lesson A1-1's objectives (cell 0.3 names it; the lesson doesn't).
 

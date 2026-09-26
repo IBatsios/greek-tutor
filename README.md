@@ -4,10 +4,10 @@ A personal Modern Greek tutor that decides what you should practise today, holds
 daily routine, and shows you — on one board — exactly where your Greek is strong and where
 it has holes.
 
-> **Status (2026-09-26):** the tutor engine and progress model are written and unit-tested,
-> but the app has **not yet been run end to end against the real Claude API**, the board and
-> "Today" screens are not built, and it is **text-only** — speaking and listening practice
-> arrive with voice (roadmap stages 10–11). The plan to a daily-usable product is in
+> **Status (2026-09-26):** the tutor engine, progress model and board UI are written and
+> tested, but the app has **not yet been run end to end against the real Claude API**, and it
+> is **text-only** — speaking and listening practice arrive with voice (roadmap stages 10–11).
+> The daily check sheet lives in the companion tracker app, which mirrors this board. The plan to a daily-usable product is in
 > [`docs/handoff-items/00-ROADMAP.md`](docs/handoff-items/00-ROADMAP.md).
 
 ---
@@ -46,7 +46,7 @@ it has holes.
 |---|---|---|
 | **The board** (8 × 8 actions) | Every action coloured not started / in progress / done | 25 actions score themselves from session data (lesson scores, recall rates, errors, time) — you can't tick them to feel good. 15 move from your daily check sheet. 24 are honest self-assessment and are marked as such. |
 | **Focus limit** | "Focus 4/5" | At most 5 actions in play at once (Harada's rule). The server refuses a 6th. Too many goals is how none move. |
-| **Daily check sheet** | Today's short list: clear your review queue, 10 min listening, 5 min reading aloud, 3 sentences written, shadowing | Each tick feeds a board action with a target like "6 of the last 7 days". |
+| **Daily check sheet** (in the tracker app) | Today's short list: clear your review queue, 10 min listening, 5 min reading aloud, 3 sentences written, shadowing | Each tick feeds a board action with a target like "6 of the last 7 days". The tracker is your phone-first daily page; this app owns the board it mirrors. |
 | **Never miss two days** | Streak, and a nudge at your practice time if you haven't started | Missing one day is life; missing two is a new habit. The board's habit action measures exactly this. |
 | **Proof, not feelings** | "Measured by …" on every action | Each action says how it's scored — a lesson score, recall rate on a word cluster, an error that has stopped appearing, days practised. |
 | **90-day review** | A review at the end of each cycle | What moved, what didn't, which actions carry over, and the next target. |
@@ -85,12 +85,12 @@ hold a 5-minute introduction conversation.*
 |---|---|---|
 | 5 min | Review due words (flashcards) | Reschedules each word; ticks "SRS cleared" automatically at zero |
 | 25 min | One tutor session on today's focus action | Chooses the objective, drills it, grades the session, rescores the board |
-| 10 min | Listen to Greek audio, no subtitles | You tick it on the check sheet |
-| 5 min | Read aloud; write three sentences about your day | You tick them; the diary line keeps a record |
+| 10 min | Listen to Greek audio, no subtitles | You tick it on the tracker's check sheet |
+| 5 min | Read aloud; write three sentences about your day | You tick them in the tracker |
 | Weekly | 5-minute error review; one real conversation | Shows your top recurring errors and leech words |
 
-Some of this (flashcard review, Today screen, nudges, audio) is on the roadmap rather than in
-the code yet — see the status note at the top.
+Some of this (flashcard review, nudges, audio, the tracker feeding check-sheet ticks back
+into the board) is on the roadmap rather than in the code yet — see the status note at the top.
 
 ## The eight themes
 
@@ -105,8 +105,8 @@ the code yet — see the status note at the top.
 | 7 | Writing — Γραφή | Three sentences daily; Greek keyboard; 100 words about yourself |
 | 8 | Habit & Environment — Συνήθεια | 45 min/day in the same block; never miss two days; phone in Greek |
 
-The full board with every action and how it's measured: `docs/harada-board.html` (open it in a
-browser). Where the code does and doesn't yet match it: `docs/REQUIREMENTS_TRACE.md`.
+The board lives at `/` once you sign in. The original prototype with every action and how
+it's measured: `docs/harada-board.html` (open it in a browser). Where the code does and doesn't yet match it: `docs/REQUIREMENTS_TRACE.md`.
 
 ---
 
@@ -115,10 +115,11 @@ browser). Where the code does and doesn't yet match it: `docs/REQUIREMENTS_TRACE
 ```bash
 cp .env.example .env
 #   POSTGRES_PASSWORD   openssl rand -hex 24
-#   ANTHROPIC_API_KEY   your Claude API key
+#   ANTHROPIC_API_KEY   your Claude API key (or use your subscription — see below)
 #   COOKIE_SECRET       any long random string
 docker compose up -d --build
-# → http://127.0.0.1:8080  (sign up, then start a session)
+#   APP_TIMEZONE        where you practise, so "today" matches your evenings
+# → http://127.0.0.1:8080  (sign up, set your goal and 3–5 focus cells, start a session)
 ```
 
 | Service | Role |
@@ -142,6 +143,45 @@ and phone access. `COOKIE_SECURE=true` works on `https://` and on `http://localh
 
 Database built by hand before `scripts/migrate.py` existed? Run once:
 `docker compose run --rm migrate python scripts/migrate.py --baseline`.
+
+### Choosing how the app talks to Claude
+
+The tutor needs a Claude model on every turn. There are two ways to pay for that, picked
+with `LLM_BACKEND` in `.env`:
+
+| | `LLM_BACKEND=api` (default) | `LLM_BACKEND=claude_cli` |
+|---|---|---|
+| **What it uses** | An API key from the [Claude Console](https://platform.claude.com) | Your own Claude Pro/Max subscription, through the official `claude` program (Claude Code) |
+| **Cost** | Pay per token | Counts against your subscription's usage limits |
+| **Who can use the app** | Any number of learners | **You only.** Signup closes after the first account; the app refuses to start if two exist |
+| **Setup** | `ANTHROPIC_API_KEY=…` | `claude setup-token` on your machine → paste into `CLAUDE_CODE_OAUTH_TOKEN`; Docker also needs `WITH_CLAUDE_CLI=true` and a rebuild |
+| **Per-turn speed** | Fast | A few seconds slower (one short-lived `claude` process per turn) |
+| **Prompt caching** | Under the app's control | Up to the CLI |
+
+**Why the subscription option is single-learner, and why it runs the `claude` program
+instead of calling the API with your login.** Anthropic's terms let you sign in to the
+unmodified Claude Code program with your own subscription, but don't allow apps to call
+Claude with a subscription login directly, or to serve other people's requests on your plan.
+So `claude_cli` mode runs the real `claude` binary for each turn, with no tools, none of your
+Claude Code customizations (`--safe-mode`), and a scrubbed environment. It also refuses to
+serve a second learner. Details: [Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance).
+
+Switching to your subscription in Docker:
+
+```bash
+claude setup-token                 # on your own machine; prints a one-year token
+# .env
+LLM_BACKEND=claude_cli
+CLAUDE_CODE_OAUTH_TOKEN=<the token>
+WITH_CLAUDE_CLI=true
+CLAUDE_CLI_VERSION=stable          # pin an exact version (e.g. 2.1.283) once it works
+docker compose up -d --build
+```
+
+Without Docker, having `claude` installed and signed in with `claude /login` on the same
+machine is enough; leave `CLAUDE_CODE_OAUTH_TOKEN` empty. The app strips any
+`ANTHROPIC_API_KEY` from the `claude` process's environment, because the CLI would
+otherwise use the key instead of your subscription.
 
 ### Without Docker
 
@@ -174,22 +214,31 @@ FastAPI + asyncpg (raw SQL) + PostgreSQL + the Claude API. Jinja2 templates with
 
 ### The Harada board engine
 
-Spec: `docs/HARADA_INTEGRATION.md`. Cell definitions: `seed/harada.sql` (40 cells score
+Spec: `docs/HARADA_INTEGRATION.md`. The dashboard (`/`) **is** the board: the 9×9 mandala from
+`docs/harada-board.html` rendered from `GET /api/harada`, with the goal/cycle form, the focus
+list, and a detail panel per cell. Cell definitions: `seed/harada.sql` (40 cells score
 automatically, 24 are manual). Scoring is pure Python in `app/harada_metrics.py`; the contract
 for each `metric_kind` is in its module docstring.
 
 | Endpoint | Form fields | Notes |
 |---|---|---|
-| `GET /api/harada` | — | Board JSON: themes → actions with state, progress, is_focus |
+| `GET /api/harada` | — | The board payload (`docs/HARADA_BOARD_CONTRACT.md`) |
 | `POST /api/harada/goal` | `goal_text`, `cycle_text`, `cycle_days`, `restart_cycle?` | Upsert the central goal / 90-day cycle |
 | `POST /api/harada/action/{id}/focus` | `on=true\|false` | Max 5 focus cells, enforced server-side (409) |
 | `POST /api/harada/action/{id}/state` | `state=not_started\|in_progress\|done` | Manual cells only (409 otherwise) |
-| `POST /api/harada/routine` | `key`, `checked`, `log_date?` | Daily check sheet; keys are the `routine_days` metric keys |
+| `POST /api/harada/routine` | `key`, `checked`, `log_date?` | Check-sheet write path; the sheet UI lives in the tracker |
 | `POST /api/harada/recompute` | — | Rescore now (also runs at every session close) |
 | `GET /healthz` | — | Liveness + DB check (Docker healthcheck) |
 
-Until the board UI lands (stage 03), drive it with curl and your session cookie, e.g.
-`curl -b gt_session=… -d on=true localhost:8080/api/harada/action/12/focus`.
+### Mirror for the tracker
+
+Set `HARADA_EXPORT_PATH` and the same payload is written to that file, atomically, after
+every board change (session close, focus, manual state, goal). The tracker bind-mounts it
+read-only and mirrors the Greek board through `linked` cells; it never writes back. Contract,
+ownership split and consumer rules: `docs/HARADA_BOARD_CONTRACT.md`. With one learner leave
+`HARADA_EXPORT_USER_ID` empty; once a second account exists the export stops (logged) until
+you pin it to a `users.id`. In Docker, the path is inside the container: compose mounts
+`./export` at `/export`, so use `HARADA_EXPORT_PATH=/export/greek-board.json`.
 
 ### Tests
 
@@ -208,5 +257,6 @@ pytest                                          # DB tests skip unless TEST_DATA
 | `docs/handoff-items/00-ROADMAP.md` | **Start here** — staged plan, one file per coding session |
 | `docs/REQUIREMENTS_TRACE.md` | Board vs code, cell by cell |
 | `docs/HARADA_INTEGRATION.md` | The spec for the progress engine |
+| `docs/HARADA_BOARD_CONTRACT.md` | The board payload the tracker reads (schema 1) |
 | `docs/harada-board.html` | The board prototype — the requirement |
 | `CLAUDE.md` | Conventions for anyone (or any agent) changing the code |

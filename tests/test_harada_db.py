@@ -190,3 +190,100 @@ async def test_only_manual_cells_can_be_set_by_hand(user_id):
         await harada.set_manual_state(user_id, await _action_id(2, 0), "done")
     with pytest.raises(LookupError):
         await harada.set_manual_state(user_id, 10**9, "done")
+
+
+# --- export ------------------------------------------------------------------------
+
+
+async def test_board_payload_has_all_64_cells_and_a_null_goal(user_id):
+    payload = await harada.board_payload(user_id)
+
+    assert payload["schema"] == 1 and payload["board"] == "greek"
+    assert payload["goal"] is None
+    assert payload["totals"]["actions"] == 64
+    assert payload["totals"] == {"actions": 64, "done": 0, "in_progress": 0, "not_started": 64,
+                                 "computed": 40, "manual": 24}
+    assert [t["slot"] for t in payload["themes"]] == list(range(8))
+    assert all(len(t["actions"]) == 8 for t in payload["themes"])
+
+
+async def test_set_goal_round_trips_and_restart_resets_the_cycle(user_id):
+    first = await harada.set_goal(user_id, "Speak Greek", "Finish A1", 90, False)
+    await db.pool().execute(
+        "UPDATE harada_goals SET cycle_start = CURRENT_DATE - 10 WHERE user_id = $1", user_id)
+
+    kept = await harada.set_goal(user_id, "Speak Greek", "Finish A1", 60, False)
+    reset = await harada.set_goal(user_id, "Speak Greek", "Finish A1", 60, True)
+
+    assert first["goal_text"] == "Speak Greek" and first["cycle_day"] == 1
+    assert kept["cycle_day"] == 11 and kept["cycle_days"] == 60
+    assert reset["cycle_day"] == 1
+    assert (await harada.board_payload(user_id))["goal"]["cycle_text"] == "Finish A1"
+
+
+async def test_every_board_mutation_rewrites_the_export_file(user_id, monkeypatch, tmp_path):
+    target = tmp_path / "mirror" / "harada-greek.json"
+    monkeypatch.setattr(harada.harada_export.config, "HARADA_EXPORT_PATH", str(target))
+    monkeypatch.setattr(harada.harada_export.config, "HARADA_EXPORT_USER_ID", user_id)
+
+    def snapshot():
+        return json.loads(target.read_text(encoding="utf-8"))
+
+    await harada.recompute(user_id)
+    assert snapshot()["totals"]["not_started"] == 64
+
+    await harada.set_focus(user_id, await _action_id(2, 3), True)
+    assert snapshot()["focus"]["count"] == 1
+
+    await harada.set_manual_state(user_id, await _action_id(7, 6), "done")
+    assert snapshot()["totals"]["done"] == 1
+
+    await harada.set_goal(user_id, "Speak Greek", "", 90, False)
+    assert snapshot()["goal"]["goal_text"] == "Speak Greek"
+    assert [p.name for p in target.parent.iterdir()] == ["harada-greek.json"]
+
+
+async def test_export_pinned_to_another_learner_writes_nothing(user_id, monkeypatch, tmp_path):
+    target = tmp_path / "harada-greek.json"
+    monkeypatch.setattr(harada.harada_export.config, "HARADA_EXPORT_PATH", str(target))
+    monkeypatch.setattr(harada.harada_export.config, "HARADA_EXPORT_USER_ID", user_id + 1)
+
+    await harada.recompute(user_id)
+
+    assert not target.exists()
+
+
+async def test_export_failure_never_blocks_the_board_change(user_id, monkeypatch, tmp_path):
+    blocker = tmp_path / "not-a-dir"
+    blocker.write_text("x")
+    monkeypatch.setattr(harada.harada_export.config, "HARADA_EXPORT_PATH",
+                        str(blocker / "harada-greek.json"))
+    monkeypatch.setattr(harada.harada_export.config, "HARADA_EXPORT_USER_ID", user_id)
+
+    written = await harada.recompute(user_id)
+
+    assert written == 40
+
+
+async def test_unpinned_export_stops_once_a_second_learner_exists(user_id, monkeypatch, tmp_path,
+                                                                  caplog):
+    target = tmp_path / "harada-greek.json"
+    monkeypatch.setattr(harada.harada_export.config, "HARADA_EXPORT_PATH", str(target))
+    monkeypatch.setattr(harada.harada_export.config, "HARADA_EXPORT_USER_ID", None)
+    p = db.pool()
+    await p.execute("DELETE FROM users WHERE id <> $1", user_id)   # sole account
+    await harada.recompute(user_id)
+    assert target.exists()
+    target.unlink()
+
+    other = await p.fetchval(
+        "INSERT INTO users (email, password_hash) VALUES ($1, 'x') RETURNING id",
+        f"harada-other-{secrets.token_hex(4)}@test.invalid")
+    try:
+        with caplog.at_level("WARNING", logger="app.harada"):
+            written = await harada.recompute(user_id)
+    finally:
+        await p.execute("DELETE FROM users WHERE id = $1", other)
+
+    assert written == 40 and not target.exists()
+    assert "HARADA_EXPORT_USER_ID" in caplog.text

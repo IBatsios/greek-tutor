@@ -195,16 +195,19 @@ This is also the natural place for the level-change job the README already flags
 
 ## 7. UI
 
-`templates/dashboard.html` becomes the board. Two views off the same data:
+`templates/dashboard.html` is the board. Two views off the same data:
 
 - **Grid** — the 9×9 mandala, cells coloured by `state`, focus cells ringed. Same markup
-  as the HTML board; swap the hard-coded `THEMES` array for a `/api/harada` JSON endpoint.
+  as the HTML board; the hard-coded `THEMES` array is replaced by `GET /api/harada`.
 - **Today** — the routine check sheet plus one button: *Start session on <focus action>*.
 
-HTMX fits this well: each cell is a `hx-post="/api/harada/action/{id}/toggle"` that swaps
-its own outer HTML back. No client state to keep in sync.
-
----
+> **Decided 2026-09-13.** Vanilla JS `fetch` + JSON endpoints, not HTMX: the board is one
+> payload with theme rollups, which is easier to render from JSON than from out-of-band
+> swaps. And the **routine check sheet is not built here**: it lives in the tracker
+> (`tracker/docs/plan.md`, habits with `board_action_id`), which is the phone-first daily
+> page. The dashboard keeps a *Start today's session* button; the session itself picks
+> the weakest focus cell. The board is also exported as a file for the tracker to mirror —
+> see `docs/HARADA_BOARD_CONTRACT.md`.
 
 ## 8. Suggested build order
 
@@ -214,11 +217,12 @@ its own outer HTML back. No client state to keep in sync.
 | 2 | `app/harada.py` recompute, called at session close | cells move on their own |
 | 3 | Focus-cell block in the tutor prompt | sessions get an objective |
 | 4 | Grid view on the dashboard | you can see the shape of your Greek |
-| 5 | Routine check sheet + `routine_log` | `routine_days` metrics start working |
+| 5 | ~~Routine check sheet~~ — deferred to the tracker (2026-09-13); `routine_log` and the scorer stay | `routine_days` cells move once the tracker feeds them |
 | 6 | Cycle close + review | the loop closes |
 
 Steps 1–3 are the whole idea and are worth doing before any UI. Step 4 is what makes it
-motivating; steps 5–6 are what make it Harada rather than just a skill tree.
+motivating; steps 5–6 are what make it Harada rather than just a skill tree. Steps 1–4
+are done; step 5 moved to the tracker; step 6 is next.
 
 ---
 

@@ -29,14 +29,17 @@ project into a habit.
 - [ ] Compose service `backup` (postgres:16 image, loop: `pg_dump -Fc` nightly to `/backups`, keep 14 daily + 8 weekly). Bind-mount `/backups` to a host path that your existing NAS/PBS backup already covers.
 - [ ] `docs/RUNBOOK.md`: restore into a scratch container and run `GET /api/harada` against it. Do the restore drill once, for real.
 
-### C. Nudges
+### C. Nudges — only if the roadmap decision puts them here
+The tracker is already the phone-first Today page; the default is that **it** nudges, using
+`streak`, `last_active` and the current focus from the export (add those keys — adding is
+allowed under schema 1). If nudges stay here instead:
 - [ ] `scripts/nudge.py` run by a compose service every 15 min: for each user with `practice_time` passed today and no activity today, send one nudge (record in a `nudges` table so it sends once a day).
 - [ ] Channel per roadmap decision. ntfy: one HTTP POST, no account. Message names today's focus action and streak: "Day 12 🔥 — 10 minutes on final sigma keeps it alive."
 - [ ] Second nudge only when the streak is about to break (inactive yesterday and today).
 
 ### D. Phone
 - [ ] `static/manifest.webmanifest` + icons → installable to the home screen.
-- [ ] Check Today, Review and Practice at 390 px width; the Greek input helper must not cover the send button.
+- [ ] Check the board, Review and Practice at 390 px width; the Greek input helper must not cover the send button.
 
 ## Definition of done
 

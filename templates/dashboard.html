@@ -1,19 +1,425 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Greek Tutor</title>
-  <style>
-    body{font-family:system-ui;max-width:32rem;margin:3rem auto;padding:0 1rem}
-    a.btn{display:inline-block;padding:.7rem 1.2rem;background:#1a5fb4;color:#fff;
-          border-radius:.4rem;text-decoration:none}
-  </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greek Tutor — Harada board</title>
+<style>
+  :root{
+    --bg:#0e1117; --surface:#161b24; --surface2:#1d242f; --line:#2a3240;
+    --txt:#e6edf6; --muted:#8b97a8; --dim:#5d6878;
+    --goal:#0d5eaf; --goal2:#1e7fd6; --done:#2f9e6b; --wip:#c9922e; --err:#d0736b;
+    --radius:7px;
+    --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:var(--font);font-size:15px;line-height:1.5;
+       -webkit-font-smoothing:antialiased;padding:24px 20px 64px}
+  .wrap{max-width:1500px;margin:0 auto}
+
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;
+         border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:22px}
+  h1{margin:0;font-size:24px;font-weight:650;letter-spacing:-.02em}
+  h1 .gr{color:var(--goal2);font-weight:500}
+  .sub{color:var(--muted);font-size:13.5px;margin-top:4px}
+  .hdr-right{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  form.inline{display:inline}
+
+  button,a.btn{font-family:var(--font);font-size:12.5px;font-weight:500;color:var(--txt);
+    background:var(--surface2);border:1px solid var(--line);border-radius:var(--radius);
+    padding:7px 13px;cursor:pointer;transition:.14s;text-decoration:none;display:inline-block;line-height:1.4}
+  button:hover,a.btn:hover{background:#252d3a;border-color:#3a4655}
+  button.primary,a.btn.primary{background:var(--goal);border-color:var(--goal2)}
+  button.primary:hover,a.btn.primary:hover{background:var(--goal2)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.danger{border-color:#5a3a3a}
+
+  .panels{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:14px;margin-bottom:24px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:15px 17px}
+  .panel h2{margin:0 0 10px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+            color:var(--dim);font-weight:600}
+  .field{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:6px;
+         color:var(--txt);font-family:var(--font);font-size:13.5px;padding:8px 10px;margin-bottom:8px}
+  .field:focus{outline:none;border-color:var(--goal2)}
+  textarea.field{resize:vertical;min-height:58px;line-height:1.45}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+  .row input[type=number]{width:5.5rem;margin:0}
+  .row label{display:flex;align-items:center;gap:5px;cursor:pointer}
+  .big{font-size:29px;font-weight:650;letter-spacing:-.02em;line-height:1.1}
+  .big small{font-size:13px;font-weight:400;color:var(--muted);letter-spacing:0}
+  .bar{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-top:9px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--goal),var(--done));
+         border-radius:4px;transition:width .3s}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:11px;font-size:11.5px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .swatch{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .hint{font-size:11.5px;color:var(--dim);line-height:1.5}
+  .hint.warn{color:var(--wip)}
+
+  .focus-list{list-style:none;margin:0;padding:0}
+  .focus-list li{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #202836;font-size:12.5px}
+  .focus-list li:last-child{border-bottom:none}
+  .focus-list .dot{width:9px;height:9px;border-radius:2.5px;flex:none}
+  .focus-list .nm{flex:1;min-width:0;cursor:pointer}
+  .focus-list .nm:hover{color:#fff}
+  .focus-list .pct{color:var(--muted);font-size:11px;width:2.6rem;text-align:right;flex:none}
+  .focus-list .x{padding:2px 7px;font-size:11px;flex:none}
+
+  .boardwrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+  .board{display:grid;grid-template-columns:repeat(9,1fr);grid-auto-rows:1fr;gap:3px;
+         background:var(--line);border:2px solid var(--line);border-radius:10px;padding:3px}
+  .cell{position:relative;background:var(--surface);border-radius:4px;padding:7px 7px 6px;min-height:92px;
+        cursor:pointer;display:flex;flex-direction:column;justify-content:center;font-size:11px;line-height:1.28;
+        color:#cbd5e3;transition:background .13s,box-shadow .13s,color .13s;overflow:hidden;user-select:none}
+  .cell:hover{background:var(--surface2);box-shadow:inset 0 0 0 1px #3d4a5c}
+  .cell .gk{display:block;font-size:10px;color:var(--dim);margin-top:3px}
+  .cell.bx{margin-right:6px} .cell.by{margin-bottom:6px}
+  .cell.goal{background:linear-gradient(150deg,var(--goal) 0%,#0a4a8c 100%);color:#fff;font-size:12.5px;
+             font-weight:600;text-align:center;align-items:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+  .cell.goal .gk{color:rgba(255,255,255,.72);font-size:10.5px;margin-top:5px}
+  .cell.theme{font-weight:600;font-size:11.5px;text-align:center;align-items:center;color:#f2f6fb;background:var(--surface2)}
+  .cell.theme::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+  .cell.theme.mirror{background:#141a23}
+  .cell.theme .pct{font-size:10px;font-weight:500;color:var(--muted);margin-top:5px}
+  .cell.act[data-s="in_progress"]{background:#3a2f14;color:#f0dcae;box-shadow:inset 0 0 0 1px #6b551f}
+  .cell.act[data-s="done"]{background:#12321f;color:#a8dcc0;box-shadow:inset 0 0 0 1px #2a6b48}
+  .cell.act[data-s="done"] .num{background:var(--done);color:#fff;border-color:var(--done)}
+  .cell.act[data-s="in_progress"] .num{background:var(--wip);color:#231a06;border-color:var(--wip)}
+  .cell.act.focus{box-shadow:inset 0 0 0 2px var(--goal2)}
+  .cell.act.focus[data-s="done"]{box-shadow:inset 0 0 0 2px var(--goal2),inset 0 0 0 3px #2a6b48}
+  .cell.act.sel{outline:2px solid #fff;outline-offset:-2px}
+  .cell.act.manual .num{border-style:dashed}
+  .num{position:absolute;top:5px;right:5px;font-size:8.5px;font-weight:600;color:var(--dim);
+       border:1px solid var(--line);border-radius:3px;padding:0 3.5px;line-height:13px;height:14px}
+  .star{position:absolute;top:4px;left:5px;font-size:10px;color:var(--goal2)}
+  .cell.dimmed{opacity:.24}
+  .cell.focusblk{box-shadow:inset 0 0 0 1.5px var(--goal2)}
+
+  .rail{position:sticky;top:20px;display:flex;flex-direction:column;gap:14px}
+  .theme-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid #202836;cursor:pointer}
+  .theme-row:last-child{border-bottom:none}
+  .theme-row .dot{width:9px;height:9px;border-radius:2.5px;flex:none}
+  .theme-row .nm{font-size:12.5px;flex:1;min-width:0}
+  .theme-row .mini{width:64px;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;flex:none}
+  .theme-row .mini>i{display:block;height:100%;border-radius:3px;transition:width .3s}
+  .theme-row .n{font-size:11px;color:var(--muted);width:26px;text-align:right;flex:none}
+  .theme-row.on{background:#1a2130;border-radius:5px;padding-left:6px;padding-right:6px}
+
+  #detail .dt-th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:6px}
+  #detail .dt-a{font-size:14px;line-height:1.4;margin-bottom:9px}
+  #detail .dt-m{font-size:12px;color:var(--muted);line-height:1.5}
+  #detail .dt-m strong{color:var(--txt)}
+  #detail .states{display:flex;gap:6px;margin-top:12px}
+  #detail .states button{flex:1;font-size:11.5px;padding:6px 4px}
+  #detail .actions{display:flex;gap:6px;margin-top:10px}
+  #detail .actions button{flex:1}
+
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2b1a1a;color:#f3c9c4;
+         border:1px solid var(--err);border-radius:8px;padding:9px 14px;font-size:13px;max-width:90vw;
+         opacity:0;pointer-events:none;transition:opacity .2s}
+  #toast.on{opacity:1}
+  kbd{background:var(--surface2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;
+      font-size:10.5px;font-family:var(--font);color:var(--muted)}
+
+  @media(max-width:1180px){.boardwrap{grid-template-columns:1fr}.panels{grid-template-columns:1fr}.rail{position:static}}
+  @media(max-width:700px){
+    body{padding:14px 12px 48px}
+    .cell{min-height:38px;padding:4px}
+    .cell.act .lbl,.cell .gk,.cell.theme .pct{display:none}
+    .cell.theme{font-size:9px}
+    .cell.goal{font-size:9.5px}
+    .num{position:static;margin:0 auto}
+    .star{top:2px;left:3px}
+  }
+</style>
 </head>
 <body>
-  <h1>Γεια σου, {{ user.display_name }}!</h1>
-  <p>Level: <strong>{{ user.level_estimate }}</strong> ·
-     Practice today: <strong>{{ minutes_used }} min</strong></p>
-  <p><a class="btn" href="/practice">Start today's session →</a></p>
-  <form method="post" action="/logout"><button>Log out</button></form>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Γεια σου, {{ user.display_name or 'μαθητή' }} <span class="gr">/ Harada board</span></h1>
+    <div class="sub">Level <strong>{{ user.level_estimate }}</strong> · practice today
+      <strong>{{ minutes_used }} min</strong> · click a cell to see how it is measured and to focus it.</div>
+  </div>
+  <div class="hdr-right">
+    <button type="button" id="showAll">Show all</button>
+    <button type="button" id="rescore">Rescore</button>
+    <a class="btn primary" href="/practice" id="startBtn">Start today's session →</a>
+    <form class="inline" method="post" action="/logout"><button>Log out</button></form>
+  </div>
+</header>
+
+<div class="panels">
+  <div class="panel">
+    <h2>Central goal · Ο ΣΤΟΧΟΣ</h2>
+    <form id="goalForm">
+      <textarea class="field" id="goalText" maxlength="2000" required
+        placeholder="Hold a real, unscripted conversation in Greek — 10 minutes, everyday topics."></textarea>
+      <h2 style="margin-top:10px">Current cycle target</h2>
+      <input class="field" id="cycleText" maxlength="2000" placeholder="Finish A1 lessons 1–12 …">
+      <div class="row">
+        <span>Cycle length <input class="field" type="number" id="cycleDays" min="1" max="365" value="90"> days</span>
+        <label><input type="checkbox" id="restartCycle"> restart cycle today</label>
+        <span style="margin-left:auto"><button type="submit">Save goal</button></span>
+      </div>
+      <div class="hint" id="cycleInfo" style="margin-top:6px">No goal set yet.</div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Progress · 64 actions</h2>
+    <div class="big"><span id="pctDone">0</span>%<small> &nbsp;<span id="cntDone">0</span> done ·
+      <span id="cntWip">0</span> in progress</small></div>
+    <div class="bar"><i id="barFill" style="width:0%"></i></div>
+    <div class="legend">
+      <span><i class="swatch" style="background:#161b24;border:1px solid #2a3240"></i>Not started</span>
+      <span><i class="swatch" style="background:#c9922e"></i>In progress</span>
+      <span><i class="swatch" style="background:#2f9e6b"></i>Done</span>
+      <span><i class="swatch" style="border:2px solid #1e7fd6"></i>Focus</span>
+    </div>
+    <div class="hint" style="margin-top:12px"><span id="cntComputed">40</span> cells score themselves from
+      your sessions; <span id="cntManual">24</span> (dashed badge) you set by hand. The daily routine
+      check sheet lives in the tracker.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Focus · <span id="focusCount">0</span>/<span id="focusMax">5</span></h2>
+    <ul class="focus-list" id="focusList"></ul>
+    <div class="hint" id="focusHint" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<div class="boardwrap">
+  <div class="board" id="board"></div>
+  <div class="rail">
+    <div class="panel">
+      <h2>Eight themes</h2>
+      <div id="themeList"></div>
+    </div>
+    <div class="panel" id="detail">
+      <div class="dt-th" style="color:var(--dim)">No cell selected</div>
+      <div class="dt-a" style="color:var(--muted);font-size:13px">Click any of the 64 outer cells to see what it
+        means, how it is measured, and to make it a focus cell.</div>
+    </div>
+    <div class="panel">
+      <h2>How to read the grid</h2>
+      <div class="hint">The centre block holds the goal and the eight themes; each surrounding block expands one
+        theme into eight actions. Sessions open on your weakest focus cell.<br><br>
+        <kbd>click</kbd> select a cell &nbsp; <kbd>theme</kbd> isolate its block &nbsp; <kbd>Esc</kbd> show all</div>
+    </div>
+  </div>
+</div>
+
+</div>
+<div id="toast" role="alert"></div>
+
+<script>
+/* Harada layout: the eight non-centre positions of a 3×3, in reading order. */
+const POS = [[0,0],[0,1],[0,2],[1,0],[1,2],[2,0],[2,1],[2,2]];
+const ACCENT = ['#4c8fd6','#9b7fd4','#d0736b','#4fa3a3','#c78a45','#6f9c4f','#c56fa1','#7d8fa6'];
+const GOAL_GR = 'Μιλάω ελληνικά';
+
+let board = null;        // last payload from GET /api/harada
+let selectedId = null;   // action id shown in the detail panel
+let isolated = null;     // theme slot whose block is highlighted, or null
+
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('on'), 3500);
+}
+
+/* One fetch wrapper: form fields in, JSON out; an expired session goes back to /login. */
+async function api(path, fields) {
+  const opts = fields ? {method: 'POST', body: new URLSearchParams(fields)} : {};
+  const r = await fetch(path, opts);
+  if (r.redirected || !(r.headers.get('content-type') || '').includes('json')) {
+    location.href = '/login'; throw new Error('not signed in');
+  }
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.detail || `Request failed (${r.status})`);
+  return data;
+}
+async function act(fn) {
+  try { await fn(); await load(); } catch (e) { toast(e.message); }
+}
+async function load() { board = await api('/api/harada'); render(); }
+
+function actions() { return board.themes.flatMap(t => t.actions.map(a => ({...a, theme: t}))); }
+function findAction(id) { return actions().find(a => a.id === id) || null; }
+
+/* ---------------------------------------------------------------- grid */
+function buildCell(row, col) {
+  const br = Math.floor(row / 3), bc = Math.floor(col / 3), ir = row % 3, ic = col % 3;
+  const cell = el('div', 'cell');
+  if (ic === 2 && bc < 2) cell.classList.add('bx');
+  if (ir === 2 && br < 2) cell.classList.add('by');
+  const centre = br === 1 && bc === 1;
+  const posIdx = POS.findIndex(p => p[0] === ir && p[1] === ic);
+  const blockIdx = POS.findIndex(p => p[0] === br && p[1] === bc);
+
+  if (centre && ir === 1 && ic === 1) {
+    cell.classList.add('goal');
+    cell.append(el('div', 'lbl', board.goal ? board.goal.goal_text : 'Set your goal ↑'));
+    cell.append(el('span', 'gk', GOAL_GR));
+    cell.onclick = () => $('goalText').focus();
+    return cell;
+  }
+  const themeSlot = centre ? posIdx : blockIdx;
+  const theme = board.themes[themeSlot];
+  if (centre || (ir === 1 && ic === 1)) {
+    cell.classList.add('theme'); if (!centre) cell.classList.add('mirror');
+    cell.style.setProperty('--acc', ACCENT[themeSlot]);
+    cell.dataset.block = themeSlot;
+    cell.append(el('span', 'lbl', theme.name_en), el('span', 'gk', theme.name_el),
+                el('span', 'pct', `${theme.done}/8`));
+    cell.onclick = () => isolate(isolated === themeSlot ? null : themeSlot);
+    return cell;
+  }
+  const a = theme.actions[posIdx];
+  cell.classList.add('act'); cell.dataset.block = blockIdx; cell.dataset.s = a.state;
+  if (a.is_focus) cell.classList.add('focus');
+  if (a.is_manual) cell.classList.add('manual');
+  if (a.id === selectedId) cell.classList.add('sel');
+  cell.title = a.label;
+  const badge = a.is_manual ? (a.state === 'done' ? '✓' : a.state === 'in_progress' ? '…' : `${posIdx + 1}`)
+                            : `${Math.round(a.progress * 100)}%`;
+  cell.append(el('span', 'num', badge));
+  if (a.is_focus) cell.append(el('span', 'star', '★'));
+  cell.append(el('span', 'lbl', a.label));
+  cell.onclick = () => { selectedId = a.id; render(); };
+  return cell;
+}
+
+function renderBoard() {
+  const grid = $('board'); grid.replaceChildren();
+  for (let row = 0; row < 9; row++) for (let col = 0; col < 9; col++) grid.append(buildCell(row, col));
+  applyIsolation();
+}
+
+function isolate(slot) { isolated = slot; applyIsolation(); }
+function applyIsolation() {
+  document.querySelectorAll('.cell').forEach(c => {
+    c.classList.remove('dimmed', 'focusblk');
+    if (isolated === null) return;
+    const isCentre = c.classList.contains('goal') || (c.classList.contains('theme') && !c.classList.contains('mirror'));
+    if (+c.dataset.block === isolated) c.classList.add('focusblk');
+    else if (!isCentre) c.classList.add('dimmed');
+  });
+  document.querySelectorAll('.theme-row').forEach(r => r.classList.toggle('on', isolated !== null && +r.dataset.row === isolated));
+}
+
+/* ---------------------------------------------------------------- panels */
+function renderThemes() {
+  const wrap = $('themeList'); wrap.replaceChildren();
+  board.themes.forEach(t => {
+    const row = el('div', 'theme-row'); row.dataset.row = t.slot;
+    const dot = el('i', 'dot'); dot.style.background = ACCENT[t.slot];
+    const mini = el('span', 'mini'); const fill = el('i');
+    fill.style.width = `${t.done / 8 * 100}%`; fill.style.background = ACCENT[t.slot]; mini.append(fill);
+    row.append(dot, el('span', 'nm', t.name_en), mini, el('span', 'n', `${t.done}/8`));
+    row.onclick = () => isolate(isolated === t.slot ? null : t.slot);
+    wrap.append(row);
+  });
+}
+
+function renderTotals() {
+  const t = board.totals;
+  $('pctDone').textContent = Math.round(t.done / t.actions * 100);
+  $('cntDone').textContent = t.done; $('cntWip').textContent = t.in_progress;
+  $('cntComputed').textContent = t.computed; $('cntManual').textContent = t.manual;
+  $('barFill').style.width = `${t.done / t.actions * 100}%`;
+}
+
+function renderFocus() {
+  const f = board.focus;
+  $('focusCount').textContent = f.count; $('focusMax').textContent = f.max;
+  const list = $('focusList'); list.replaceChildren();
+  actions().filter(a => a.is_focus).forEach(a => {
+    const li = el('li');
+    const dot = el('i', 'dot'); dot.style.background = ACCENT[a.theme.slot];
+    const nm = el('span', 'nm', a.label); nm.onclick = () => { selectedId = a.id; render(); };
+    const x = el('button', 'x', '✕'); x.type = 'button'; x.title = 'Remove from focus';
+    x.onclick = () => act(() => api(`/api/harada/action/${a.id}/focus`, {on: 'false'}));
+    li.append(dot, nm, el('span', 'pct', `${Math.round(a.progress * 100)}%`), x);
+    list.append(li);
+  });
+  const hint = $('focusHint');
+  if (f.count < f.min) {
+    hint.className = 'hint warn';
+    hint.textContent = `Harada's rule: pick ${f.min}–${f.max} focus cells. Click a cell, then “Focus”. ` +
+      `Until then sessions fall back to the next lesson.`;
+  } else {
+    hint.className = 'hint';
+    hint.textContent = 'Sessions open on the weakest of these. More than five and none of them move.';
+  }
+}
+
+function renderGoal() {
+  const g = board.goal, info = $('cycleInfo');
+  if (!g) { info.textContent = 'No goal set yet — the board is unfocused until you write one.'; return; }
+  if (document.activeElement !== $('goalText')) $('goalText').value = g.goal_text;
+  if (document.activeElement !== $('cycleText')) $('cycleText').value = g.cycle_text;
+  $('cycleDays').value = g.cycle_days;
+  info.textContent = g.days_left >= 0
+    ? `Day ${g.cycle_day} of ${g.cycle_days} · ${g.days_left} left · cycle ends ${g.cycle_end}`
+    : `Cycle ended ${-g.days_left} day(s) ago — write the next target and restart the cycle.`;
+}
+
+function renderDetail() {
+  const panel = $('detail'); const a = findAction(selectedId);
+  if (!a) return;
+  panel.replaceChildren();
+  const th = el('div', 'dt-th', `${a.theme.name_en} · action ${a.slot + 1}`); th.style.color = ACCENT[a.theme.slot];
+  const m = el('div', 'dt-m'); m.append(el('strong', '', 'Measured by: '), document.createTextNode(a.measure));
+  const p = el('div', 'dt-m');
+  p.append(el('strong', '', 'Progress: '), document.createTextNode(
+    `${Math.round(a.progress * 100)}% · ${a.state.replace('_', ' ')}` +
+    (a.is_manual ? ' · set by hand' : ' · scored from your sessions') +
+    (a.updated_at ? ` · moved ${a.updated_at.slice(0, 10)}` : '')));
+  panel.append(th, el('div', 'dt-a', a.label), m, p);
+
+  if (a.is_manual) {
+    const states = el('div', 'states');
+    [['not_started', 'Not started'], ['in_progress', 'In progress'], ['done', 'Done']].forEach(([s, label]) => {
+      const b = el('button', a.state === s ? 'primary' : '', label); b.type = 'button';
+      b.onclick = () => act(() => api(`/api/harada/action/${a.id}/state`, {state: s}));
+      states.append(b);
+    });
+    panel.append(states);
+  }
+  const row = el('div', 'actions');
+  const atMax = !a.is_focus && board.focus.count >= board.focus.max;
+  const fb = el('button', a.is_focus ? 'danger' : 'primary', a.is_focus ? 'Remove from focus' : '★ Focus this cell');
+  fb.type = 'button'; fb.disabled = atMax;
+  fb.title = atMax ? `Already at ${board.focus.max} focus cells — remove one first.` : '';
+  fb.onclick = () => act(() => api(`/api/harada/action/${a.id}/focus`, {on: a.is_focus ? 'false' : 'true'}));
+  row.append(fb);
+  panel.append(row);
+}
+
+function render() { renderBoard(); renderThemes(); renderTotals(); renderFocus(); renderGoal(); renderDetail(); }
+
+/* ---------------------------------------------------------------- wiring */
+$('goalForm').onsubmit = (e) => {
+  e.preventDefault();
+  act(() => api('/api/harada/goal', {
+    goal_text: $('goalText').value, cycle_text: $('cycleText').value,
+    cycle_days: $('cycleDays').value, restart_cycle: $('restartCycle').checked ? 'true' : 'false',
+  }).then(() => { $('restartCycle').checked = false; }));
+};
+$('rescore').onclick = () => act(() => api('/api/harada/recompute', {}));
+$('showAll').onclick = () => isolate(null);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') isolate(null); });
+
+load().catch(e => toast(e.message));
+</script>
 </body>
 </html>

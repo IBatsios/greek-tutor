@@ -10,6 +10,15 @@
 
 name: greek-tutor
 
+x-app-build: &app-build
+  context: .
+  target: runtime
+  args:
+    # LLM_BACKEND=claude_cli needs the claude binary in the image. Pin the version
+    # (e.g. 2.1.283) once a real session works; "stable" tracks Anthropic's channel.
+    WITH_CLAUDE_CLI: ${WITH_CLAUDE_CLI:-false}
+    CLAUDE_CLI_VERSION: ${CLAUDE_CLI_VERSION:-stable}
+
 x-app-env: &app-env
   # Overrides DATABASE_URL from .env so the containers reach the `db` service.
   DATABASE_URL: postgresql://tutor:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/greektutor
@@ -31,7 +40,7 @@ services:
       retries: 20
 
   migrate:
-    build: { context: ., target: runtime }
+    build: *app-build
     image: greek-tutor:latest
     env_file: .env
     environment: *app-env
@@ -41,12 +50,15 @@ services:
     restart: "no"
 
   app:
-    build: { context: ., target: runtime }
+    build: *app-build
     image: greek-tutor:latest
     env_file: .env
     environment: *app-env
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:8080"
+    volumes:
+      # Board mirror for the tracker: set HARADA_EXPORT_PATH=/export/greek-board.json
+      - ./export:/export
     depends_on:
       db: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }

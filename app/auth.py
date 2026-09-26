@@ -13,13 +13,15 @@ from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
-from . import config
+from . import config, llm
 from .db import pool
 
 router = APIRouter()
 ph = PasswordHasher()  # argon2id defaults
 
 COOKIE_NAME = "gt_session"
+SIGNUP_CLOSED = ("Signup is closed: this install runs on its owner's Claude subscription "
+                 "(LLM_BACKEND=claude_cli), which serves one learner only.")
 
 
 def _hash_token(token: str) -> str:
@@ -76,6 +78,12 @@ async def signup(email: str = Form(...), password: str = Form(...),
     email = email.strip().lower()
     async with pool().acquire() as conn:
         async with conn.transaction():
+            if llm.is_single_learner_mode():
+                # Serialise signups, then allow only the first account: a personal
+                # Claude subscription may not carry anyone else's requests.
+                await conn.execute("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE")
+                if await conn.fetchval("SELECT EXISTS (SELECT 1 FROM users)"):
+                    raise HTTPException(403, SIGNUP_CLOSED)
             try:
                 user_id = await conn.fetchval(
                     "INSERT INTO users (email, password_hash) VALUES ($1,$2) RETURNING id",

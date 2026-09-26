@@ -23,6 +23,13 @@ app.include_router(harada_api.router)
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 
 
+@app.get("/healthz", include_in_schema=False)
+async def healthz():
+    """Liveness + DB reachability, for the Docker HEALTHCHECK."""
+    await db.pool().fetchval("SELECT 1")
+    return {"ok": True}
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", {})

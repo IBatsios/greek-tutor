@@ -11,7 +11,7 @@ import time
 import asyncpg
 from fastapi import APIRouter, Depends, Form, HTTPException
 
-from . import claude_client, config, harada, quota, srs
+from . import claude_client, config, harada, llm, quota, srs
 from .auth import require_user
 from .db import pool
 
@@ -92,6 +92,11 @@ async def build_user_context(user_id: int, lesson_id: int | None,
 @router.post("/start")
 async def start_session(user=Depends(require_user)):
     await quota.check_quota(user["id"])
+    async with pool().acquire() as conn:
+        try:
+            await llm.assert_single_learner(conn)
+        except llm.SingleLearnerError as e:
+            raise HTTPException(403, str(e)) from e
     focus = await harada.pick_focus(user["id"])
     lesson_id = focus.lesson_id if focus else None
     if lesson_id is None:
@@ -161,7 +166,11 @@ async def turn(session_id: int, message: str = Form(...), user=Depends(require_u
     transcript.append({"role": "user", "content": message})
 
     t0 = time.monotonic()
-    text, meta, tok_in, tok_out = await claude_client.tutor_turn(context_block, transcript)
+    try:
+        text, meta, tok_in, tok_out = await claude_client.tutor_turn(context_block, transcript)
+    except llm.LLMError as e:
+        log.warning("tutor turn failed for session %s: %s", session_id, e)
+        raise HTTPException(502, "The tutor could not answer just now — try again.") from e
     elapsed_min = (time.monotonic() - t0) / 60 + READING_ALLOWANCE_MIN
 
     async with pool().acquire() as conn:
@@ -232,7 +241,12 @@ async def close_session(session_id: int, user=Depends(require_user)):
         await pool().execute("UPDATE tutor_sessions SET ended_at=now() WHERE id=$1", session_id)
         return {"summary": "Empty session closed."}
 
-    data, tok_in, tok_out = await claude_client.evaluate_session(transcript)
+    try:
+        data, tok_in, tok_out = await claude_client.evaluate_session(transcript)
+    except llm.LLMError as e:
+        log.warning("evaluation failed for session %s: %s", session_id, e)
+        raise HTTPException(502, "Could not grade the session just now — it is still open; "
+                                 "try ending it again.") from e
     await quota.record_usage(user["id"], tok_in, tok_out, 0)
     await _store_evaluation(session_id, user["id"], sess["lesson_id"], data)
     await _rescore_board(user["id"])

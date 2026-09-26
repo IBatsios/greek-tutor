@@ -115,7 +115,7 @@ it's measured: `docs/harada-board.html` (open it in a browser). Where the code d
 ```bash
 cp .env.example .env
 #   POSTGRES_PASSWORD   openssl rand -hex 24
-#   ANTHROPIC_API_KEY   your Claude API key
+#   ANTHROPIC_API_KEY   your Claude API key (or use your subscription — see below)
 #   COOKIE_SECRET       any long random string
 docker compose up -d --build
 #   APP_TIMEZONE        where you practise, so "today" matches your evenings
@@ -143,6 +143,45 @@ and phone access. `COOKIE_SECURE=true` works on `https://` and on `http://localh
 
 Database built by hand before `scripts/migrate.py` existed? Run once:
 `docker compose run --rm migrate python scripts/migrate.py --baseline`.
+
+### Choosing how the app talks to Claude
+
+The tutor needs a Claude model on every turn. There are two ways to pay for that, picked
+with `LLM_BACKEND` in `.env`:
+
+| | `LLM_BACKEND=api` (default) | `LLM_BACKEND=claude_cli` |
+|---|---|---|
+| **What it uses** | An API key from the [Claude Console](https://platform.claude.com) | Your own Claude Pro/Max subscription, through the official `claude` program (Claude Code) |
+| **Cost** | Pay per token | Counts against your subscription's usage limits |
+| **Who can use the app** | Any number of learners | **You only.** Signup closes after the first account; the app refuses to start if two exist |
+| **Setup** | `ANTHROPIC_API_KEY=…` | `claude setup-token` on your machine → paste into `CLAUDE_CODE_OAUTH_TOKEN`; Docker also needs `WITH_CLAUDE_CLI=true` and a rebuild |
+| **Per-turn speed** | Fast | A few seconds slower (one short-lived `claude` process per turn) |
+| **Prompt caching** | Under the app's control | Up to the CLI |
+
+**Why the subscription option is single-learner, and why it runs the `claude` program
+instead of calling the API with your login.** Anthropic's terms let you sign in to the
+unmodified Claude Code program with your own subscription, but don't allow apps to call
+Claude with a subscription login directly, or to serve other people's requests on your plan.
+So `claude_cli` mode runs the real `claude` binary for each turn, with no tools, none of your
+Claude Code customizations (`--safe-mode`), and a scrubbed environment. It also refuses to
+serve a second learner. Details: [Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance).
+
+Switching to your subscription in Docker:
+
+```bash
+claude setup-token                 # on your own machine; prints a one-year token
+# .env
+LLM_BACKEND=claude_cli
+CLAUDE_CODE_OAUTH_TOKEN=<the token>
+WITH_CLAUDE_CLI=true
+CLAUDE_CLI_VERSION=stable          # pin an exact version (e.g. 2.1.283) once it works
+docker compose up -d --build
+```
+
+Without Docker, having `claude` installed and signed in with `claude /login` on the same
+machine is enough; leave `CLAUDE_CODE_OAUTH_TOKEN` empty. The app strips any
+`ANTHROPIC_API_KEY` from the `claude` process's environment, because the CLI would
+otherwise use the key instead of your subscription.
 
 ### Without Docker
 

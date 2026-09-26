@@ -1,7 +1,13 @@
 import os
 
 DATABASE_URL = os.environ["DATABASE_URL"]
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+# How the app reaches Claude (app/llm.py): "api" = Anthropic API key (default, any
+# number of learners); "claude_cli" = the claude binary signed in with your own
+# subscription (single learner only — see README).
+LLM_BACKEND = os.environ.get("LLM_BACKEND", "api").strip().lower()
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # required when LLM_BACKEND=api
+CLAUDE_CLI_PATH = os.environ.get("CLAUDE_CLI_PATH", "claude")
+CLAUDE_CLI_TIMEOUT = float(os.environ.get("CLAUDE_CLI_TIMEOUT", "120"))
 TUTOR_MODEL = os.environ.get("TUTOR_MODEL", "claude-haiku-4-5-20251001")
 EVAL_MODEL = os.environ.get("EVAL_MODEL", "claude-sonnet-4-6")
 DAILY_AI_MINUTES = float(os.environ.get("DAILY_AI_MINUTES", "90"))

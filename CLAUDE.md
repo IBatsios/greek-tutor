@@ -13,7 +13,8 @@ marked `done`, follow its file, and write its *Session notes* before stopping.
 - Python 3.12+ (3.14 locally), FastAPI, asyncpg (raw parameterized SQL, no ORM),
   Jinja2 templates + vanilla JS fetch (no HTMX — decided 2026-09-13).
 - `app/` — `auth` (argon2, DB sessions), `tutor` (session loop), `srs` (SM-2),
-  `quota`, `claude_client` (prompt + JSON contract), `harada_metrics` (pure
+  `quota`, `claude_client` (prompt + JSON contract), `llm` (the two backends:
+  Anthropic API key or the `claude` CLI on the owner's subscription), `harada_metrics` (pure
   scoring), `harada` (facts → recompute → focus pick → export), `harada_api`
   (router), `harada_export` (the board payload + mirror file, pure), `clock`.
 - `migrations/*.sql` applied in order by `scripts/migrate.py` (tracked in
@@ -40,6 +41,9 @@ marked `done`, follow its file, and write its *Session notes* before stopping.
 - `GET /api/harada` and the export file are one contract
   (`docs/HARADA_BOARD_CONTRACT.md`, `schema: 1`); the tracker reads it. Adding a
   key is fine, removing or renaming one bumps the schema.
+- Every model call goes through `llm.backend().complete(...)`; only `app/llm.py` imports
+  `anthropic` or spawns `claude`. `LLM_BACKEND=claude_cli` is single-learner by Anthropic's
+  terms — keep `assert_single_learner` and the signup gate intact.
 - The daily routine check sheet is the **tracker's** UI, not this app's. Do not
   build a second one here.
 - Branch per change (`feature/…`, `fix/…`), conventional commits, never commit `.env`.

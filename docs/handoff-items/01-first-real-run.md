@@ -44,7 +44,9 @@ with psql, run `docker compose run --rm migrate python scripts/migrate.py --base
 ### A2. Pick the backend (README → "Choosing how the app talks to Claude")
 - [ ] `LLM_BACKEND=api`: set `ANTHROPIC_API_KEY`. Or `LLM_BACKEND=claude_cli`: run `claude setup-token` on your machine, put the token in `CLAUDE_CODE_OAUTH_TOKEN`, set `SIGNUP_ENABLED=false` after your account exists.
 - [ ] Do the real session (B) on **both** backends once. Compare latency per turn and whether the JSON contract parses every time — the CLI path flattens the transcript, so it is the likelier one to drift.
-- [ ] `docker compose exec app claude --version` matches `CLAUDE_CLI_VERSION` in the Dockerfile; if a newer CLI changed `--output-format json`, `tests/test_llm_backends.py` pins the shape we parse.
+- [ ] `docker compose exec app claude --version` matches `CLAUDE_CLI_VERSION`; then pin that exact version in `.env`. If a newer CLI changes `--output-format json`, `tests/test_llm_backends.py` pins the shape we parse (recorded from 2.1.283).
+- [ ] CLI path, first turn: confirm the reply is the **tutor** (Greek, ends with a task, JSON block parsed), not Claude Code introducing itself. That proves `--system-prompt-file` replaced the default prompt. On 2026-09-26 this was confirmed with a clean environment (248 input tokens instead of ~10k); an environment with inherited `CLAUDE_CODE_*` variables ignored it, which is why `app/llm.py` builds the child's environment from an allowlist.
+- [ ] Try signing up a second account in `claude_cli` mode — expect a 403.
 
 ### B. Real session, by hand
 - [ ] Sign up at `http://127.0.0.1:8080/login`.

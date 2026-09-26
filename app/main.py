@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -5,13 +6,19 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import auth, db, harada_api, quota, tutor
+from . import auth, config, db, harada_api, llm, quota, tutor
 from .auth import current_user, require_user
+
+log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.init_pool()
+    llm.backend()  # fail fast: missing API key, or claude binary not on PATH
+    async with db.pool().acquire() as conn:
+        await llm.assert_single_learner(conn)  # claude_cli: refuse to serve >1 account
+    log.info("LLM backend: %s", config.LLM_BACKEND)
     yield
     await db.close_pool()
 

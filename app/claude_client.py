@@ -1,19 +1,17 @@
-"""Claude API wrapper.
+"""Tutor prompts and the structured-output contract, on top of app/llm.py.
 
-- Static tutor rules go first as a cached system block (prompt caching),
-  the per-user context block follows uncached.
+- Static tutor rules go first as a cached system block (prompt caching on the
+  api backend), the per-user context block follows uncached.
 - Every tutor reply ends with a fenced ```json block (the structured
   output contract); parse_reply() strips and returns it.
+- Which way Claude is reached (API key or the learner's own subscription via the
+  claude CLI) is app/llm.py's business; nothing here depends on it.
 API reference: https://docs.claude.com/en/api/overview
 """
 import json
 import re
 
-from anthropic import AsyncAnthropic
-
-from . import config
-
-client = AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
+from . import config, llm
 
 STATIC_TUTOR_PROMPT = """You are an expert Modern Greek tutor. Your student is learning Greek as a foreign language. Run a focused, encouraging tutoring session that maximizes active production (the student writing Greek), not passive explanation.
 
@@ -64,19 +62,17 @@ def parse_reply(raw: str) -> tuple[str, dict]:
 async def tutor_turn(user_context_block: str,
                      transcript: list[dict]) -> tuple[str, dict, int, int]:
     """One conversational turn. Returns (display_text, meta, tokens_in, tokens_out)."""
-    resp = await client.messages.create(
+    out = await llm.backend().complete(
         model=config.TUTOR_MODEL,
         max_tokens=1024,
         system=[
-            {"type": "text", "text": STATIC_TUTOR_PROMPT,
-             "cache_control": {"type": "ephemeral"}},
-            {"type": "text", "text": user_context_block},
+            llm.SystemBlock(STATIC_TUTOR_PROMPT, cache=True),
+            llm.SystemBlock(user_context_block),
         ],
         messages=transcript,
     )
-    raw = "".join(b.text for b in resp.content if b.type == "text")
-    text, meta = parse_reply(raw)
-    return text, meta, resp.usage.input_tokens, resp.usage.output_tokens
+    text, meta = parse_reply(out.text)
+    return text, meta, out.tokens_in, out.tokens_out
 
 
 EVAL_PROMPT = """You are evaluating a completed Greek tutoring session. Given the transcript, respond ONLY with JSON, no markdown fences:
@@ -88,18 +84,17 @@ lesson_score is a fraction from 0.0 to 1.0 (how well today's lesson objectives w
 
 
 async def evaluate_session(transcript: list[dict]) -> tuple[dict, int, int]:
-    resp = await client.messages.create(
+    out = await llm.backend().complete(
         model=config.EVAL_MODEL,
         max_tokens=800,
-        system=EVAL_PROMPT,
+        system=[llm.SystemBlock(EVAL_PROMPT)],
         messages=transcript + [{"role": "user",
                                 "content": "The session has ended. Produce the evaluation JSON now."}],
     )
-    raw = "".join(b.text for b in resp.content if b.type == "text")
-    raw = raw.strip().removeprefix("```json").removesuffix("```").strip()
+    raw = out.text.strip().removeprefix("```json").removesuffix("```").strip()
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
         data = {"summary": raw[:500], "error_patterns": [],
                 "lesson_score": None, "level_recommendation": "keep"}
-    return data, resp.usage.input_tokens, resp.usage.output_tokens
+    return data, out.tokens_in, out.tokens_out

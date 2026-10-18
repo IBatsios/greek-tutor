@@ -64,10 +64,14 @@ async def current_user(request: Request) -> asyncpg.Record | None:
 
 
 async def require_user(request: Request):
+    """The signed-in user. JSON callers (``/api/*``) get a 401 they can act on;
+    pages get a redirect to the login form (a fetch would silently follow it)."""
     user = await current_user(request)
-    if not user:
-        raise HTTPException(status_code=303, headers={"Location": "/login"})
-    return user
+    if user:
+        return user
+    if request.url.path.startswith("/api/"):
+        raise HTTPException(status_code=401, detail="Not signed in.")
+    raise HTTPException(status_code=303, headers={"Location": "/login"})
 
 
 @router.post("/signup")

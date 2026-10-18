@@ -30,9 +30,15 @@
       d.className = 'msg ' + cls; d.textContent = text;
       log.appendChild(d); log.scrollTop = log.scrollHeight;
     };
+    // Every API call: an expired session (401) goes back to the login form.
+    async function post(path, body) {
+      const r = await fetch(path, {method: 'POST', body});
+      if (r.status === 401) { location.href = '/login'; throw 0; }
+      return r;
+    }
     async function ensureSession() {
       if (sid) return sid;
-      const r = await fetch('/api/session/start', {method:'POST'});
+      const r = await post('/api/session/start');
       if (!r.ok) { add('tutor', (await r.json()).detail || 'Could not start.'); throw 0; }
       sid = (await r.json()).session_id;
       return sid;
@@ -45,17 +51,20 @@
       try {
         await ensureSession();
         const body = new URLSearchParams({message: text});
-        const r = await fetch(`/api/session/${sid}/turn`, {method:'POST', body});
+        const r = await post(`/api/session/${sid}/turn`, body);
         const data = await r.json();
         add('tutor', r.ok ? data.reply : (data.detail || 'Error.'));
       } catch {}
     };
     document.getElementById('end').onclick = async () => {
       if (!sid) { location.href = '/'; return; }
-      const r = await fetch(`/api/session/${sid}/close`, {method:'POST'});
-      const data = await r.json();
-      add('tutor', '— Session recap —\n' + (data.summary || ''));
-      sid = null;
+      try {
+        const r = await post(`/api/session/${sid}/close`);
+        const data = await r.json();
+        if (!r.ok) { add('tutor', data.detail || 'Could not end the session.'); return; }
+        add('tutor', '— Session recap —\n' + (data.summary || ''));
+        sid = null;
+      } catch {}
     };
   </script>
 </body>

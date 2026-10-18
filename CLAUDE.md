@@ -4,8 +4,10 @@ Personal Modern Greek tutor: FastAPI + asyncpg/PostgreSQL + Claude, with a
 Harada-method progress board as the model of the learner. Single learner (Yanni)
 first; multi-user schema retained. Spec: `docs/HARADA_INTEGRATION.md`. Requirement:
 the board prototype (`docs/harada-board.html`); gaps vs code: `docs/REQUIREMENTS_TRACE.md`.
-**Start every session at `docs/handoff-items/00-ROADMAP.md`** — take the first stage not
-marked `done`, follow its file, and write its *Session notes* before stopping.
+**Start every session at `docs/handoff-items/00-ROADMAP.md`** — take the first open item in
+the first phase not done (stages run voice-first, not in number order), follow its file within
+the scope the roadmap gives it, and write its *Session notes* before stopping. The roadmap's
+decisions table overrides older text in stage files. Why: `docs/handoff-items/greek-plan.md`.
 `handoff-next-phase.md` is the 2026-09-13 session log (history, not the plan).
 
 ## Stack and layout

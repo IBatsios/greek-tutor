@@ -3,6 +3,11 @@
 **Status:** not started · **Branch:** `feature/10-tts` · **Size:** one to two sessions
 **Depends on:** 02 · **Closes:** cells 0.8, 3.5, 3.6, audio half of 3.4; strengthens 3.8
 
+> **Decisions override (2026-10-18, `00-ROADMAP.md`).** Split across phases. Phase 2 does tutor
+> replies aloud only; dictation, minimal pairs and news-gist wait for phase 4. TTS is a **cloud
+> neural voice** (two voices, cached by text hash), not Piper — its only Greek voice is rated low
+> quality. The vendor comes from the listening test in the roadmap.
+
 ## Goal
 
 Give the app a voice so listening can be practised and measured inside it: hear tutor replies,

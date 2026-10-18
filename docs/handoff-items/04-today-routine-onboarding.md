@@ -3,6 +3,9 @@
 **Status:** not started · **Branch:** `feature/04-onboarding-feed` · **Size:** one session
 **Depends on:** 03
 
+> **Decisions override (2026-10-18, `00-ROADMAP.md`).** Runs in phase 3. The tick feed is
+> decided: the tracker writes an export file and this app reads it (both run on the workstation).
+
 > **Revised 2026-09-26.** The first draft of this stage built a daily check sheet here. That
 > contradicts a recorded decision: the check sheet lives in the **tracker** (the phone-first
 > Today page), and this app owns only the board. Do **not** build a second checklist here.

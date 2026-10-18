@@ -1,7 +1,7 @@
-# Requirements trace — `greek-harada-board.html` vs the code
+# Requirements trace — `docs/harada-board.html` vs the code
 
-**Date:** 2026-09-26 · **Board revision:** `docs/harada-board.html` (root `greek-harada-board.html`
-is a byte-identical copy) · **Code revision:** `feature/harada-board-ui` @ `fb07513` + Docker/roadmap.
+**Date:** 2026-09-26 · **Board revision:** `docs/harada-board.html` (the root copy was
+deleted 2026-10-18) · **Code revision:** `feature/harada-board-ui` @ `fb07513` + Docker/roadmap.
 §1 and §3 were revised the same day after rebasing onto the board-UI branch.
 
 The board is the requirement. This file says, for every board feature and every one of the
@@ -188,7 +188,7 @@ tracker-owned routine cell reads 0 no matter what you tick.
 | D3 | `error_absent` treats "not practised" as "clean" | Cells 0.2, 0.5, 2.4 go green without evidence | 02 |
 | D4 | No controlled error vocabulary; seed matches substrings of free-text slugs | Cells may never match what the eval model writes | 02 |
 | D5 | One lesson score satisfies several cells (A1-1 → 0.1 and 0.3; A1-15 → 3.5, 4.3, 6.2) | Board progress moves in jumps | accepted; note in UI |
-| D6 | Duplicate board file (`greek-harada-board.html` = `docs/harada-board.html`) | Two copies will drift | 03 — keep one |
+| D6 | Duplicate board file (`greek-harada-board.html` = `docs/harada-board.html`) | Two copies will drift | ✅ fixed 2026-10-18 — root copy deleted |
 | D9 | Tracker ticks have no path into `routine_log` | 15 routine cells stuck at 0 | 04 |
 | D7 | `require_user` returns 303 to API callers | `fetch().json()` fails on expired sessions | 01 |
 | D8 | Session never "exercises" a vocab-cell focus when the model ignores the focus block | Focus is a prompt hint, not enforced | 02 (measure) / 13 (evals) |

@@ -119,7 +119,6 @@ it's measured: `docs/harada-board.html` (open it in a browser). Where the code d
 cp .env.example .env
 #   POSTGRES_PASSWORD   openssl rand -hex 24
 #   ANTHROPIC_API_KEY   your Claude API key (or use your subscription — see below)
-#   COOKIE_SECRET       any long random string
 docker compose up -d --build
 #   APP_TIMEZONE        where you practise, so "today" matches your evenings
 # → http://127.0.0.1:8080  (sign up, set your goal and 3–5 focus cells, start a session)

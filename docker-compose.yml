@@ -1,6 +1,6 @@
 # Greek Tutor — Postgres + one-shot migrator + web app.
 #
-#   cp .env.example .env        # set POSTGRES_PASSWORD, ANTHROPIC_API_KEY, COOKIE_SECRET
+#   cp .env.example .env        # set POSTGRES_PASSWORD and ANTHROPIC_API_KEY
 #   docker compose up -d --build
 #   open http://127.0.0.1:8080
 #
@@ -92,7 +92,6 @@ services:
       DATABASE_URL: postgresql://tutor:tutor@db-test:5432/greektutor_test
       TEST_DATABASE_URL: postgresql://tutor:tutor@db-test:5432/greektutor_test
       ANTHROPIC_API_KEY: test-key-never-sent
-      COOKIE_SECRET: test-cookie-secret
     command: ["sh", "-c", "python scripts/migrate.py && ruff check app tests scripts && pytest -p no:cacheprovider"]
     depends_on:
       db-test: { condition: service_healthy }

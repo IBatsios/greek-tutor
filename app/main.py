@@ -9,6 +9,15 @@ from fastapi.templating import Jinja2Templates
 from . import auth, config, db, harada_api, llm, quota, tutor
 from .auth import current_user, require_user
 
+# uvicorn configures only its own loggers; give the app's a handler so INFO lines
+# (per-turn token and cache usage) reach `docker compose logs app`.
+_app_log = logging.getLogger("app")
+if not _app_log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    _app_log.addHandler(_handler)
+_app_log.setLevel(config.LOG_LEVEL)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -9,9 +9,17 @@
 API reference: https://docs.claude.com/en/api/overview
 """
 import json
+import logging
 import re
 
 from . import config, llm
+
+log = logging.getLogger(__name__)
+
+# Room for thinking as well as the reply: on Sonnet 5.5 thinking tokens count against
+# max_tokens, and a reply cut short loses its trailing JSON block.
+TUTOR_MAX_TOKENS = 4096
+EVAL_MAX_TOKENS = 4096
 
 STATIC_TUTOR_PROMPT = """You are an expert Modern Greek tutor. Your student is learning Greek as a foreign language. Run a focused, encouraging tutoring session that maximizes active production (the student writing Greek), not passive explanation.
 
@@ -50,27 +58,37 @@ def parse_reply(raw: str) -> tuple[str, dict]:
     m = _JSON_BLOCK.search(raw)
     meta: dict = {"vocab_events": [], "error_tags": [],
                   "objective_progress": 0.0, "level_signal": "at"}
-    if m:
-        try:
-            meta.update(json.loads(m.group(1)))
-        except json.JSONDecodeError:
-            pass
-        raw = raw[: m.start()].rstrip()
-    return raw, meta
+    if not m:
+        log.warning("tutor reply has no trailing json block (contract broken)")
+        return raw, meta
+    try:
+        meta.update(json.loads(m.group(1)))
+    except json.JSONDecodeError as e:
+        log.warning("tutor reply json block does not parse: %s", e)
+    return raw[: m.start()].rstrip(), meta
 
 
 async def tutor_turn(user_context_block: str,
                      transcript: list[dict]) -> tuple[str, dict, int, int]:
-    """One conversational turn. Returns (display_text, meta, tokens_in, tokens_out)."""
+    """One conversational turn. Returns (display_text, meta, tokens_in, tokens_out).
+
+    ``user_context_block`` must stay identical for the whole session: it sits ahead of
+    the conversation, so any change to it makes the cached history unreadable.
+    """
     out = await llm.backend().complete(
         model=config.TUTOR_MODEL,
-        max_tokens=1024,
+        max_tokens=TUTOR_MAX_TOKENS,
+        effort=config.TUTOR_EFFORT,
+        cache_history=True,
         system=[
             llm.SystemBlock(STATIC_TUTOR_PROMPT, cache=True),
             llm.SystemBlock(user_context_block),
         ],
         messages=transcript,
     )
+    log.info("tutor turn %s: in=%d out=%d cache_read=%d cache_write=%d", config.TUTOR_MODEL,
+             out.tokens_in, out.tokens_out, out.cache_read, out.cache_write)
+    log.debug("tutor raw reply: %s", out.text)
     text, meta = parse_reply(out.text)
     return text, meta, out.tokens_in, out.tokens_out
 
@@ -86,7 +104,8 @@ lesson_score is a fraction from 0.0 to 1.0 (how well today's lesson objectives w
 async def evaluate_session(transcript: list[dict]) -> tuple[dict, int, int]:
     out = await llm.backend().complete(
         model=config.EVAL_MODEL,
-        max_tokens=800,
+        max_tokens=EVAL_MAX_TOKENS,
+        effort=config.EVAL_EFFORT,
         system=[llm.SystemBlock(EVAL_PROMPT)],
         messages=transcript + [{"role": "user",
                                 "content": "The session has ended. Produce the evaluation JSON now."}],

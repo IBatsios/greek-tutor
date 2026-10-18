@@ -33,8 +33,8 @@ them would make the board lie.
 - [ ] **Completion %** — confirm the headline % separates measured (computed) from
   self-reported (manual) progress, per spec §9. `totals` already has `computed`/`manual`
   counts; the UI may need a second number.
-- [ ] One copy of the prototype: `docs/harada-board.html` is referenced everywhere;
-  `greek-harada-board.html` at the root is a duplicate (roadmap decision).
+- [x] One copy of the prototype: `docs/harada-board.html` is referenced everywhere;
+  the root duplicate was deleted 2026-10-18.
 
 ## Definition of done
 

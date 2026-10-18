@@ -4,6 +4,11 @@
 **Depends on:** 10 · **Ends at:** Milestone M2 — speaks and reads
 **Closes:** cells 0.4, 0.7, 4.1 (voice), 4.4, 7.8
 
+> **Decisions override (2026-10-18, `00-ROADMAP.md`).** Split across phases. Phase 2 does voice
+> turns in `/practice` only (text fallback, speaking minutes, the latency gate); recordings,
+> shadowing and timed drills wait for phase 4. STT is **cloud (Azure `el-GR`)**, not faster-whisper
+> `small` (34% Greek WER on native speakers). Voice turns use the `api` backend, which streams.
+
 ## Goal
 
 The central goal is a spoken conversation. Until now the app could only practise it in writing.

@@ -3,6 +3,12 @@
 **Status:** not started · **Branch:** `feature/06-deploy` · **Size:** one session
 **Depends on:** 05 · **Ends at:** Milestone M1 — daily-usable (text)
 
+> **Decisions override (2026-10-18, `00-ROADMAP.md`).** Runs in phase 2, before 05, so the phone
+> mic gets HTTPS: deploy and backups only. Host is the **workstation** on the `ibatsios_default`
+> network (not the homelab VM), at `greek.ioannisbatsios.com` with a third nginx server block
+> mirroring `private.conf` and its own Access app. **Nudges are the tracker's job, via ntfy** —
+> skip the nudge tasks here.
+
 ## Goal
 
 The app runs on your homelab, reachable from your phone over HTTPS, backs itself up every

@@ -3,6 +3,11 @@
 **Status:** not started · **Branch:** `feature/01-first-real-run` · **Size:** one session
 **Depends on:** `feature/harada-board-ui` merged; `feature/docker-roadmap` and `feature/llm-backends` on top of it
 
+> **Decisions override (2026-10-18, `00-ROADMAP.md`).** Run on `LLM_BACKEND=api` with
+> `TUTOR_MODEL=claude-sonnet-5-5`, and update `.env.example` from the old Haiku 4.5 / Sonnet 4.6
+> IDs. Where this file assumes Haiku (e.g. the 4,096-token cache prefix), re-check the minimum
+> cacheable prefix for the model you actually run.
+
 ## Goal
 
 The app has never run end to end against the real Claude API. By the end of this stage it

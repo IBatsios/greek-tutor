@@ -253,10 +253,47 @@ and report it: it's the one thing about the CLI path that could only be checked 
 | Run the tests | `docker compose --profile test run --rm test` | `pip install -r requirements-dev.txt`, then `ruff check app tests scripts` and `pytest` (DB tests need `TEST_DATABASE_URL`) |
 | Switch API key ↔ subscription | edit `.env`; `docker compose up -d --build` | edit `.env`, reload it, restart uvicorn |
 | Wipe everything | `docker compose down -v` — **deletes the database** | drop and recreate the database |
-| Back up the DB | `docker compose exec db pg_dump -U tutor -Fc -f /tmp/gt.dump greektutor` then `docker compose cp db:/tmp/gt.dump .\greektutor.dump` (don't use `>`: PowerShell 5 re-encodes binary output) | `pg_dump -Fc -f greektutor.dump $env:DATABASE_URL` |
+| Back up the DB | See [Back up and restore](#back-up-and-restore) below | same section |
+| List accounts | `docker compose exec db psql -U tutor -d greektutor -c "SELECT id, email, created_at FROM users"` | `psql $env:DATABASE_URL -c "SELECT id, email, created_at FROM users"` |
+| Remove an account | Back up first, then `docker compose exec db psql -U tutor -d greektutor -c "DELETE FROM users WHERE email = 'old@example.test'"` — its sessions, words, board and usage go with it | same `DELETE` through `psql $env:DATABASE_URL` |
 
 Switching to a subscription mode with two or more accounts in the database: the app refuses to
 start and says so. Go back to `LLM_BACKEND=api`, or remove the extra account.
+
+**The tracker's mirror file and accounts.** With `HARADA_EXPORT_USER_ID` empty, the export
+file is written only while exactly one account exists. A second account (a test sign-up, say)
+silently freezes it on whatever it last showed. Pin it to your own id (from *List accounts*)
+in `.env`, then `docker compose up -d`; it rewrites on your next board change (**Rescore** on `/`).
+
+### Back up and restore
+
+Back up **before every migration** (any `git pull` that adds a file under `migrations/`) and
+before removing an account. Keep dumps outside the repo — they hold your learning history.
+`.gitignore` also ignores `*.dump` and `backups/` in case one lands in the repo by mistake.
+
+```powershell
+# Back up (PowerShell, Docker). Don't use `>`: PowerShell 5 re-encodes binary output.
+New-Item -ItemType Directory -Force ..\greek-tutor-backups | Out-Null
+$f = "greektutor-$(Get-Date -Format yyyy-MM-dd_HHmm).dump"
+docker compose exec db pg_dump -U tutor -Fc -f /tmp/gt.dump greektutor
+docker compose cp db:/tmp/gt.dump "..\greek-tutor-backups\$f"
+docker compose exec db rm /tmp/gt.dump
+
+# Check a dump is readable (lists its contents, changes nothing)
+docker compose cp "..\greek-tutor-backups\$f" db:/tmp/gt.dump
+docker compose exec db pg_restore --list /tmp/gt.dump
+
+# Restore — REPLACES the current data with the dump's. Stop the app first.
+docker compose stop app
+docker compose cp "..\greek-tutor-backups\$f" db:/tmp/gt.dump
+docker compose exec db pg_restore -U tutor -d greektutor --clean --if-exists --no-owner /tmp/gt.dump
+docker compose exec db rm /tmp/gt.dump
+docker compose up -d
+```
+
+Python on the host (modes C/D): `pg_dump -Fc -f ..\greek-tutor-backups\greektutor.dump $env:DATABASE_URL`
+to back up, `pg_restore -d $env:DATABASE_URL --clean --if-exists --no-owner <file>` to restore.
+Tested 2026-10-18: a dump restored into a scratch database with every table and migration.
 
 ---
 

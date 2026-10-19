@@ -254,6 +254,20 @@ def test_api_request_sets_effort_and_caches_the_growing_conversation():
     assert "cache_control" not in kwargs["system"][1]
 
 
+@pytest.mark.parametrize("stop_reason,details,needle", [
+    ("refusal", type("D", (), {"category": "cyber"})(), "category: cyber"),
+    ("refusal", None, "category: unspecified"),
+    ("max_tokens", None, "cut off"),
+])
+def test_unusable_stops_raise_so_nothing_half_parsed_is_stored(stop_reason, details, needle):
+    with pytest.raises(llm.LLMError, match=needle):
+        llm.check_stop_reason(stop_reason, details, "claude-sonnet-5-5")
+
+
+def test_a_normal_stop_passes():
+    llm.check_stop_reason("end_turn", None, "claude-sonnet-5-5")
+
+
 def test_api_request_leaves_optional_settings_out_when_unset():
     kwargs = llm.api_request(model="m", max_tokens=10, effort=None, cache_history=False,
                              system=[llm.SystemBlock("S")], messages=[])

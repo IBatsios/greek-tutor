@@ -140,9 +140,16 @@ def check_stop_reason(stop_reason: str | None, stop_details: Any, model: str) ->
     ``end_turn`` is the normal case. ``max_tokens`` means the reply was cut off — for
     the tutor that loses the trailing JSON block. ``refusal`` means the model declined
     (``stop_details.category`` says why) and the text is not a usable answer.
+
+    Both raise: the caller then stores nothing and the student retries. Passing a
+    truncated reply through would save the turn without the data the board and SRS
+    are built from.
     """
-    # TODO(human): handle "max_tokens" and "refusal" (raise LLMError, log, or let it pass)
-    return
+    if stop_reason == "refusal":
+        category = getattr(stop_details, "category", None) or "unspecified"
+        raise LLMError(f"{model} declined to answer (refusal, category: {category})")
+    if stop_reason == "max_tokens":
+        raise LLMError(f"{model} hit max_tokens; the reply was cut off before its end")
 
 
 # --- claude_cli: pure helpers ------------------------------------------------

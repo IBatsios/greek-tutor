@@ -31,7 +31,7 @@ phase 1 runs on the teach skill and a human tutor, not this app (greek-plan.md, 
 
 | # | Stage | Scope in this phase | Status |
 |---|---|---|---|
-| 01 | [First real run](01-first-real-run.md) | As written, on `LLM_BACKEND=api` with `TUTOR_MODEL=claude-sonnet-5-5`; update `.env.example` model IDs | not started |
+| 01 | [First real run](01-first-real-run.md) | As written, on `LLM_BACKEND=api` with `TUTOR_MODEL=claude-sonnet-5-5`; update `.env.example` model IDs | **done** 2026-10-18 (CLI-backend checks moved to "Backend per mode"; 1 of 3 transcripts) |
 | 02 | [Honest measurement](02-honest-measurement.md) | As written; real study time is what the 60-minute block (cell 7.1) is measured against | not started |
 
 **Done when:** a real session moves the board and the study-time numbers are honest.
@@ -134,4 +134,4 @@ The 2026-10-18 decisions override older text in the stage files.
 | TTS vendor | Phase 2, stage 10 | The listening test above |
 | Voice latency target | Phase 2 gate | First measurement on the phone |
 | Pronunciation scoring for Greek | Phase 4, stage 11 rest | Check Azure's pronunciation-assessment tab for `el-GR` |
-| Default model for `EVAL_MODEL` | Stage 01 | Confirm the current Sonnet ID resolves; revisit with stage 13 |
+| ~~Default model for `EVAL_MODEL`~~ | — | Settled 2026-10-18: `claude-sonnet-5-5` resolves and grades well (A1-1 → 0.93, sensible patterns); revisit with stage 13 |

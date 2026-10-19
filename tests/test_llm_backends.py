@@ -264,6 +264,13 @@ def test_unusable_stops_raise_so_nothing_half_parsed_is_stored(stop_reason, deta
         llm.check_stop_reason(stop_reason, details, "claude-sonnet-5-5")
 
 
+def test_workspace_header_is_sent_only_when_configured():
+    assert llm.api_headers("") == {}
+    assert llm.api_headers("wrkspc_123") == {"anthropic-workspace-id": "wrkspc_123"}
+    backend = llm.ApiBackend("test-key-never-sent", "wrkspc_123")
+    assert backend._client.default_headers["anthropic-workspace-id"] == "wrkspc_123"
+
+
 def test_a_normal_stop_passes():
     llm.check_stop_reason("end_turn", None, "claude-sonnet-5-5")
 

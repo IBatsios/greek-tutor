@@ -6,6 +6,9 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 # subscription (single learner only — see README).
 LLM_BACKEND = os.environ.get("LLM_BACKEND", "api").strip().lower()
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # required when LLM_BACKEND=api
+# Only for an API key that is not scoped to a workspace: the API then needs the
+# workspace to bill (sent as the anthropic-workspace-id header). Empty = not sent.
+ANTHROPIC_WORKSPACE_ID = os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip()
 CLAUDE_CLI_PATH = os.environ.get("CLAUDE_CLI_PATH", "claude")
 CLAUDE_CLI_TIMEOUT = float(os.environ.get("CLAUDE_CLI_TIMEOUT", "120"))
 TUTOR_MODEL = os.environ.get("TUTOR_MODEL", "claude-sonnet-5-5")

@@ -79,10 +79,11 @@ class ApiBackend:
 
     name = "api"
 
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, workspace_id: str = "") -> None:
         from anthropic import AsyncAnthropic  # imported lazily: CLI-only installs may lack it
 
-        self._client = AsyncAnthropic(api_key=api_key)
+        self._client = AsyncAnthropic(api_key=api_key,
+                                      default_headers=api_headers(workspace_id))
 
     async def complete(self, *, model: str, system: list[SystemBlock],
                        messages: list[dict[str, str]], max_tokens: int,
@@ -108,6 +109,11 @@ class ApiBackend:
             cache_read=getattr(usage, "cache_read_input_tokens", 0) or 0,
             cache_write=cache_write,
         )
+
+
+def api_headers(workspace_id: str) -> dict[str, str]:
+    """Extra headers for every API call: the workspace, for a key not scoped to one."""
+    return {"anthropic-workspace-id": workspace_id} if workspace_id else {}
 
 
 def api_request(*, model: str, system: list[SystemBlock], messages: list[dict[str, str]],
@@ -310,7 +316,7 @@ def make_backend(name: str) -> Backend:
     if name == "api":
         if not config.ANTHROPIC_API_KEY:
             raise LLMError("LLM_BACKEND=api needs ANTHROPIC_API_KEY.")
-        return ApiBackend(config.ANTHROPIC_API_KEY)
+        return ApiBackend(config.ANTHROPIC_API_KEY, config.ANTHROPIC_WORKSPACE_ID)
     if name == "claude_cli":
         return ClaudeCliBackend(resolve_cli(config.CLAUDE_CLI_PATH), config.CLAUDE_CLI_TIMEOUT)
     raise LLMError(f"LLM_BACKEND must be one of {BACKENDS}, got {name!r}")

@@ -1,6 +1,6 @@
 # Requirements trace — `docs/harada-board.html` vs the code
 
-**Date:** 2026-09-26 · **Board revision:** `docs/harada-board.html` (the root copy was
+**Date:** 2026-09-26 · **Updated:** 2026-10-18 after the first real run (§5, D7) · **Board revision:** `docs/harada-board.html` (the root copy was
 deleted 2026-10-18) · **Code revision:** `feature/harada-board-ui` @ `fb07513` + Docker/roadmap.
 §1 and §3 were revised the same day after rebasing onto the board-UI branch.
 
@@ -55,10 +55,10 @@ Status key: ✅ matches the board · ⚠️ measured, but not the way the board 
 | # | Action | Board says | Code does | St. | Gap → stage |
 |---|---|---|---|---|---|
 | 0.1 | Write all 24 letters | A1-1 objective scored ≥0.9 | A1-1 lesson score ≥0.9 | ✅ | Scores the whole lesson, not the one objective; also moves 0.3 |
-| 0.2 | Final sigma ς vs σ | pattern absent 5 sessions | `error_absent` "sigma", 5 sessions | ⚠️ | Absence ≠ mastery: 5 sessions that never used ς score 100%. Model's slugs are free text, so "sigma" may never match. → 02 (error taxonomy + "exercised" check) |
+| 0.2 | Final sigma ς vs σ | pattern absent 5 sessions | `error_absent` "sigma", 5 sessions | ⚠️ | Absence ≠ mastery: 5 sessions that never used ς score 100%. Model's slugs are free text, so "sigma" may never match. → 02 (error taxonomy + "exercised" check). 2026-10-18 run: the eval wrote `final_sigma_omitted`, which matched — the cell correctly stayed at 0 |
 | 0.3 | Vowel digraphs αι ει οι ου | A1-1 objective ≥0.9 | A1-1 lesson ≥0.9 | ✅ | A1-1 objectives list αι/ει/ου — add οι to the lesson seed → 02 |
 | 0.4 | Clusters μπ ντ γκ τζ | tutor pronunciation check 10/10 | manual | ✋ | Needs voice → 11 |
-| 0.5 | τόνος on 50 words | stress errors <5% of turns | pattern absent 5 sessions | ⚠️ | Per-turn `error_tags` are parsed then dropped, so a per-turn rate is impossible → 02 |
+| 0.5 | τόνος on 50 words | stress errors <5% of turns | pattern absent 5 sessions | ⚠️ | Per-turn `error_tags` are parsed then dropped, so a per-turn rate is impossible → 02. 2026-10-18 run: went to 20% (1 of 5 clean sessions) from a session that never practised τόνος — D3 observed |
 | 0.6 | Shadow 5 min daily | check sheet 6/7 | `routine_days` shadow_5 6/7 | ✅ | Tracker feed → 04 |
 | 0.7 | Record a paragraph vs native | monthly recording, self-scored | manual | ✋ | Recording store → 11 |
 | 0.8 | δ/θ, γ before ε/ι | minimal-pair drill 18/20 | manual | ✋ | Needs TTS audio → 10 |
@@ -83,7 +83,7 @@ Status key: ✅ matches the board · ⚠️ measured, but not the way the board 
 | 2.1 | είμαι, έχω | A1-3, A1-7 ≥0.9 | same | ✅ | |
 | 2.2 | -ω and -άω present | A1-9, A1-16 ≥0.9 | same | ✅ | |
 | 2.3 | Nom/acc/gen with article | A1-5, 13, 21 ≥0.85 | same | ✅ | |
-| 2.4 | Gender from ending | pattern absent 5 sessions | same ("gender") | ⚠️ | Same vacuous-truth + slug problem as 0.2 → 02 |
+| 2.4 | Gender from ending | pattern absent 5 sessions | same ("gender") | ⚠️ | Same vacuous-truth + slug problem as 0.2 → 02. 2026-10-18 run: the eval wrote `article_gender_mismatch`, which matched — focus cell correctly stayed at 0 |
 | 2.5 | δεν/μην, questions | A1-9 objective | A1-9 lesson ≥0.85 | ✅ | |
 | 2.6 | θα and να | A1-19 ≥0.85 | same | ✅ | |
 | 2.7 | Aorist of 30 verbs | A2 gate; drill 27/30 | manual | ✋ | No A2 lessons → 12 |
@@ -190,5 +190,30 @@ tracker-owned routine cell reads 0 no matter what you tick.
 | D5 | One lesson score satisfies several cells (A1-1 → 0.1 and 0.3; A1-15 → 3.5, 4.3, 6.2) | Board progress moves in jumps | accepted; note in UI |
 | D6 | Duplicate board file (`greek-harada-board.html` = `docs/harada-board.html`) | Two copies will drift | ✅ fixed 2026-10-18 — root copy deleted |
 | D9 | Tracker ticks have no path into `routine_log` | 15 routine cells stuck at 0 | 04 |
-| D7 | `require_user` returns 303 to API callers | `fetch().json()` fails on expired sessions | 01 |
+| D7 | `require_user` returns 303 to API callers | `fetch().json()` fails on expired sessions | ✅ fixed 2026-10-18 (stage 01): `/api/*` gets 401 JSON, pages keep the redirect |
 | D8 | Session never "exercises" a vocab-cell focus when the model ignores the focus block | Focus is a prompt hint, not enforced | 02 (measure) / 13 (evals) |
+| D10 | The tutor writes Markdown (bold, tables); the practice page shows it as raw text (`white-space: pre-wrap`) | `**καφές**` and `|---|` tables on screen; readable but noisy | 05 |
+| D11 | A refused or truncated reply (`check_stop_reason` raises) was billed but is not written to `usage_ledger` | Tokens and minutes under-counted on failed turns | 02 |
+
+## 5. First real run (2026-10-18, stage 01)
+
+One 15-turn text session in Docker on `LLM_BACKEND=api`, tutor and evaluator on
+`claude-sonnet-5-5` (effort `low` / `medium`). Learner: a simulated A0 learner with deliberate
+slips (Δ/Θ swap, forgotten Υ, σ for final ς, "ο γάλα", "η μέλι"). Focus: 0.1, 1.2, 2.4; the
+session opened on 0.1 (lesson A1-1). Transcript: `tests/fixtures/transcripts/2026-10-18-a1-alphabet-sonnet-5-5.json`.
+Ten cells moved, identical on the board UI and in the export file (`schema: 1`, written at close):
+
+| Cell | Moved to | Why | Honest? |
+|---|---|---|---|
+| 0.1 letters (focus) | done, 100% | Eval scored lesson A1-1 at 0.93 ≥ 0.9; all 24 letters were written from memory | Yes |
+| 0.3 vowel digraphs | done, 100% | Same A1-1 score (D5). αι/ει/ου were drilled; οι never came up | Partly — D5 |
+| 0.5 τόνος | 20% | 1 of 5 sessions without a stress/accent pattern — but τόνος was never practised | No — D3 |
+| 1.2 10 new words (focus) | 20% | 18 words entered the learner's SRS (≥10) in 1 of the last 5 sessions | Yes |
+| 1.3 / 1.4 500 / 1,500 words | 1% / 0.5% | 7 words seen ≥2× at ≥80% recall | Yes |
+| 1.7 topic clusters | 2% | 7 of 320 cluster slots: the model tagged café words `cafe` | Yes |
+| 4.1 15 min per session | 7% | 5.0 "AI minutes" ÷ 15 ÷ 5 sessions | Mode is wrong (D1, stage 11) |
+| 7.2 no two idle days | 3% | 1 active day of 30 | Yes |
+
+Cells that correctly did **not** move: 0.2 (eval pattern `final_sigma_omitted` matched "sigma")
+and 2.4 (focus; `article_gender_mismatch` matched "gender"). On this run D4's slug risk did not
+bite, but nothing guarantees the next eval words it the same way (stage 02).

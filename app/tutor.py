@@ -102,10 +102,12 @@ async def start_session(user=Depends(require_user)):
     if lesson_id is None:
         lesson_id = await next_lesson_id(user["id"], user["level_estimate"])
     focus_action_id = focus.action_id if focus else None
+    # Built once and frozen for the session, so the prompt prefix stays cacheable.
+    context_block = await build_user_context(user["id"], lesson_id, focus)
     sid = await pool().fetchval(
-        """INSERT INTO tutor_sessions (user_id, lesson_id, mode, focus_action_id)
-           VALUES ($1, $2, 'text', $3) RETURNING id""",
-        user["id"], lesson_id, focus_action_id,
+        """INSERT INTO tutor_sessions (user_id, lesson_id, mode, focus_action_id, context_block)
+           VALUES ($1, $2, 'text', $3, $4) RETURNING id""",
+        user["id"], lesson_id, focus_action_id, context_block,
     )
     if lesson_id:
         await pool().execute(
@@ -127,7 +129,7 @@ async def _load_transcript(session_id: int) -> list[dict]:
 
 async def _own_session(session_id: int, user_id: int) -> asyncpg.Record:
     row = await pool().fetchrow(
-        """SELECT id, ended_at, lesson_id, focus_action_id
+        """SELECT id, ended_at, lesson_id, focus_action_id, context_block
            FROM tutor_sessions WHERE id=$1 AND user_id=$2""",
         session_id, user_id,
     )
@@ -159,10 +161,12 @@ async def turn(session_id: int, message: str = Form(...), user=Depends(require_u
     if len(transcript) >= config.SESSION_MAX_TURNS:
         raise HTTPException(400, "Session turn limit reached — please close the session.")
 
-    focus = None
-    if sess["focus_action_id"]:
-        focus = await harada.focus_for_action(user["id"], sess["focus_action_id"])
-    context_block = await build_user_context(user["id"], sess["lesson_id"], focus)
+    context_block = sess["context_block"]
+    if context_block is None:  # a session started before migration 004
+        focus = None
+        if sess["focus_action_id"]:
+            focus = await harada.focus_for_action(user["id"], sess["focus_action_id"])
+        context_block = await build_user_context(user["id"], sess["lesson_id"], focus)
     transcript.append({"role": "user", "content": message})
 
     t0 = time.monotonic()

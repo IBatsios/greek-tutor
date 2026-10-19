@@ -213,8 +213,10 @@ class _FakeBackend:
         self.text = text
         self.calls = []
 
-    async def complete(self, *, model, system, messages, max_tokens):
-        self.calls.append({"model": model, "system": system, "messages": messages})
+    async def complete(self, *, model, system, messages, max_tokens, effort=None,
+                       cache_history=False):
+        self.calls.append({"model": model, "system": system, "messages": messages,
+                           "effort": effort, "cache_history": cache_history})
         return llm.Completion(text=self.text, tokens_in=11, tokens_out=7)
 
 
@@ -231,6 +233,52 @@ async def test_tutor_turn_goes_through_whichever_backend_is_configured(monkeypat
     assert call["model"] == config.TUTOR_MODEL
     assert call["system"][0].cache and not call["system"][1].cache  # static prompt cached
     assert call["system"][1].text == "CONTEXT"
+    assert call["cache_history"] and call["effort"] == config.TUTOR_EFFORT
+
+
+def test_tutor_reply_without_its_json_block_keeps_the_text_and_logs(caplog):
+    text, meta = claude_client.parse_reply("Γεια σου! Τι κάνεις;")
+    assert text == "Γεια σου! Τι κάνεις;" and meta["vocab_events"] == []
+    assert "no trailing json block" in caplog.text
+
+
+def test_api_request_sets_effort_and_caches_the_growing_conversation():
+    kwargs = llm.api_request(
+        model="claude-sonnet-5-5", max_tokens=4096, effort="low", cache_history=True,
+        system=[llm.SystemBlock("RULES", cache=True), llm.SystemBlock("CONTEXT")],
+        messages=[{"role": "user", "content": "Γεια"}],
+    )
+    assert kwargs["output_config"] == {"effort": "low"}
+    assert kwargs["cache_control"] == {"type": "ephemeral"}   # top-level: moves with the tail
+    assert kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert "cache_control" not in kwargs["system"][1]
+
+
+@pytest.mark.parametrize("stop_reason,details,needle", [
+    ("refusal", type("D", (), {"category": "cyber"})(), "category: cyber"),
+    ("refusal", None, "category: unspecified"),
+    ("max_tokens", None, "cut off"),
+])
+def test_unusable_stops_raise_so_nothing_half_parsed_is_stored(stop_reason, details, needle):
+    with pytest.raises(llm.LLMError, match=needle):
+        llm.check_stop_reason(stop_reason, details, "claude-sonnet-5-5")
+
+
+def test_workspace_header_is_sent_only_when_configured():
+    assert llm.api_headers("") == {}
+    assert llm.api_headers("wrkspc_123") == {"anthropic-workspace-id": "wrkspc_123"}
+    backend = llm.ApiBackend("test-key-never-sent", "wrkspc_123")
+    assert backend._client.default_headers["anthropic-workspace-id"] == "wrkspc_123"
+
+
+def test_a_normal_stop_passes():
+    llm.check_stop_reason("end_turn", None, "claude-sonnet-5-5")
+
+
+def test_api_request_leaves_optional_settings_out_when_unset():
+    kwargs = llm.api_request(model="m", max_tokens=10, effort=None, cache_history=False,
+                             system=[llm.SystemBlock("S")], messages=[])
+    assert "output_config" not in kwargs and "cache_control" not in kwargs
 
 
 async def test_evaluate_session_parses_json_from_either_backend(monkeypatch):

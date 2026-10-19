@@ -52,12 +52,14 @@ decisions table overrides older text in stage files. Why: `docs/handoff-items/gr
 - `ruff check app tests scripts` and `pytest` must pass before a merge request.
 - When a stage changes how a board cell is measured, update `docs/REQUIREMENTS_TRACE.md`.
 
-## Status snapshot (2026-09-26)
+## Status snapshot (2026-10-18)
 
 Phase 1 text tutor is written; Harada steps 1–4 are implemented and tested (schema,
 seed, recompute at session close, focus-driven session start, CURRENT FOCUS prompt
 block, the board UI on `/`, the versioned export the tracker mirrors). Step 5 (routine
-sheet) is deferred to the tracker by decision. Docker (compose + migrator) added
-2026-09-26 but **not yet built** — it was written where Docker Hub and PyPI were
-unreachable. **The app has not yet been run end to end against the real Claude API.**
-Next: stage 01 in `docs/handoff-items/00-ROADMAP.md`.
+sheet) is deferred to the tracker by decision. Stage 01 is done: Docker builds and runs,
+and a real 15-turn session on `claude-sonnet-5-5` (api backend) moved the board, with the
+conversation prompt-cached from turn 2 (the per-session context block is frozen for that —
+keep it byte-stable). Deps are pinned exactly. HTTP tests (`tests/test_http_session.py`) use
+`auth_client` / `fake_claude` from `tests/conftest.py`. Details: stage 01 *Session notes*.
+Next: stage 02 in `docs/handoff-items/00-ROADMAP.md`.

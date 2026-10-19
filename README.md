@@ -4,9 +4,12 @@ A personal Modern Greek tutor that decides what you should practise today, holds
 daily routine, and shows you — on one board — exactly where your Greek is strong and where
 it has holes.
 
-> **Status (2026-09-26):** the tutor engine, progress model and board UI are written and
-> tested, but the app has **not yet been run end to end against the real Claude API**, and it
-> is **text-only** — speaking and listening practice arrive with voice (roadmap stages 10–11).
+> **Status (2026-10-18):** the tutor engine, progress model and board UI are written and
+> tested, and the app has now **run end to end against the real Claude API** in Docker: a
+> 15-turn session on Claude Sonnet 5.5 moved ten board cells, and from the second turn on the
+> conversation is read from the prompt cache. The scores are not honest yet (session minutes,
+> "not practised" counted as clean; roadmap stage 02). It is **text-only**: speaking and
+> listening practice arrive with voice (roadmap stages 10–11).
 > The daily check sheet lives in the companion tracker app, which mirrors this board. The plan to a daily-usable product is in
 > [`docs/handoff-items/00-ROADMAP.md`](docs/handoff-items/00-ROADMAP.md).
 
@@ -119,7 +122,6 @@ it's measured: `docs/harada-board.html` (open it in a browser). Where the code d
 cp .env.example .env
 #   POSTGRES_PASSWORD   openssl rand -hex 24
 #   ANTHROPIC_API_KEY   your Claude API key (or use your subscription — see below)
-#   COOKIE_SECRET       any long random string
 docker compose up -d --build
 #   APP_TIMEZONE        where you practise, so "today" matches your evenings
 # → http://127.0.0.1:8080  (sign up, set your goal and 3–5 focus cells, start a session)
@@ -252,6 +254,10 @@ pip install -r requirements-dev.txt
 ruff check app tests scripts
 pytest                                          # DB tests skip unless TEST_DATABASE_URL is set
 ```
+
+`tests/test_http_session.py` drives the real routes over HTTP (signup, cookie, DB) with the
+model calls faked; the fake replays a real Sonnet 5.5 reply from
+`tests/fixtures/transcripts/`, where recorded sessions live for replay (stage 13).
 
 ### Project docs
 

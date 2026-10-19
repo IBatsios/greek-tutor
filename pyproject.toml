@@ -3,6 +3,7 @@
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]  # pytest 9 no longer puts the rootdir on sys.path for the console script
 addopts = "-q"
 
 [tool.ruff]

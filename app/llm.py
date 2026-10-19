@@ -58,13 +58,17 @@ class Completion:
     tokens_in: int
     tokens_out: int
     cache_read: int = 0
+    cache_write: int = 0  # already included in tokens_in; kept apart to verify caching
 
 
 class Backend(Protocol):
     name: str
 
     async def complete(self, *, model: str, system: list[SystemBlock],
-                       messages: list[dict[str, str]], max_tokens: int) -> Completion: ...
+                       messages: list[dict[str, str]], max_tokens: int,
+                       effort: str | None = None, cache_history: bool = False) -> Completion:
+        """``effort`` and ``cache_history`` are api-backend hints; others may ignore them."""
+        ...
 
 
 # --- api ---------------------------------------------------------------------
@@ -75,36 +79,83 @@ class ApiBackend:
 
     name = "api"
 
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, workspace_id: str = "") -> None:
         from anthropic import AsyncAnthropic  # imported lazily: CLI-only installs may lack it
 
-        self._client = AsyncAnthropic(api_key=api_key)
+        self._client = AsyncAnthropic(api_key=api_key,
+                                      default_headers=api_headers(workspace_id))
 
     async def complete(self, *, model: str, system: list[SystemBlock],
-                       messages: list[dict[str, str]], max_tokens: int) -> Completion:
-        blocks: list[dict[str, Any]] = []
-        for b in system:
-            block: dict[str, Any] = {"type": "text", "text": b.text}
-            if b.cache:
-                block["cache_control"] = {"type": "ephemeral"}
-            blocks.append(block)
+                       messages: list[dict[str, str]], max_tokens: int,
+                       effort: str | None = None, cache_history: bool = False) -> Completion:
         from anthropic import APIError
 
         try:
-            resp = await self._client.messages.create(
-                model=model, max_tokens=max_tokens, system=blocks, messages=messages,
-            )
+            resp = await self._client.messages.create(**api_request(
+                model=model, system=system, messages=messages, max_tokens=max_tokens,
+                effort=effort, cache_history=cache_history,
+            ))
         except APIError as e:
             detail = str(e)[:ERROR_SNIPPET]
             raise LLMError(f"Anthropic API error: {type(e).__name__}: {detail}") from e
+        check_stop_reason(resp.stop_reason, getattr(resp, "stop_details", None), model)
         text = "".join(b.text for b in resp.content if b.type == "text")
         usage = resp.usage
+        cache_write = getattr(usage, "cache_creation_input_tokens", 0) or 0
         return Completion(
             text=text,
-            tokens_in=usage.input_tokens + (getattr(usage, "cache_creation_input_tokens", 0) or 0),
+            tokens_in=usage.input_tokens + cache_write,
             tokens_out=usage.output_tokens,
             cache_read=getattr(usage, "cache_read_input_tokens", 0) or 0,
+            cache_write=cache_write,
         )
+
+
+def api_headers(workspace_id: str) -> dict[str, str]:
+    """Extra headers for every API call: the workspace, for a key not scoped to one."""
+    return {"anthropic-workspace-id": workspace_id} if workspace_id else {}
+
+
+def api_request(*, model: str, system: list[SystemBlock], messages: list[dict[str, str]],
+                max_tokens: int, effort: str | None, cache_history: bool) -> dict[str, Any]:
+    """Keyword arguments for ``messages.create`` (pure, so it is tested without the network).
+
+    ``cache_history`` adds top-level automatic caching: the API puts a breakpoint on the
+    last message and moves it forward each turn, so turn N reads turns 1..N-1 from the
+    cache. That only pays off if everything before the conversation is byte-identical
+    across turns — the caller must keep its system blocks stable for the whole session.
+    """
+    blocks: list[dict[str, Any]] = []
+    for b in system:
+        block: dict[str, Any] = {"type": "text", "text": b.text}
+        if b.cache:
+            block["cache_control"] = {"type": "ephemeral"}
+        blocks.append(block)
+    kwargs: dict[str, Any] = {"model": model, "max_tokens": max_tokens,
+                              "system": blocks, "messages": messages}
+    if effort:
+        kwargs["output_config"] = {"effort": effort}
+    if cache_history:
+        kwargs["cache_control"] = {"type": "ephemeral"}
+    return kwargs
+
+
+def check_stop_reason(stop_reason: str | None, stop_details: Any, model: str) -> None:
+    """Decide what an unusual stop means for a reply the app is about to parse.
+
+    ``end_turn`` is the normal case. ``max_tokens`` means the reply was cut off — for
+    the tutor that loses the trailing JSON block. ``refusal`` means the model declined
+    (``stop_details.category`` says why) and the text is not a usable answer.
+
+    Both raise: the caller then stores nothing and the student retries. Passing a
+    truncated reply through would save the turn without the data the board and SRS
+    are built from.
+    """
+    if stop_reason == "refusal":
+        category = getattr(stop_details, "category", None) or "unspecified"
+        raise LLMError(f"{model} declined to answer (refusal, category: {category})")
+    if stop_reason == "max_tokens":
+        raise LLMError(f"{model} hit max_tokens; the reply was cut off before its end")
 
 
 # --- claude_cli: pure helpers ------------------------------------------------
@@ -224,8 +275,10 @@ class ClaudeCliBackend:
         self._timeout = timeout_s
 
     async def complete(self, *, model: str, system: list[SystemBlock],
-                       messages: list[dict[str, str]], max_tokens: int) -> Completion:
-        # max_tokens has no CLI flag; the tutor's replies are short by instruction.
+                       messages: list[dict[str, str]], max_tokens: int,
+                       effort: str | None = None, cache_history: bool = False) -> Completion:
+        # max_tokens and effort have no CLI flag; the tutor's replies are short by
+        # instruction. Caching inside a CLI call is the CLI's own business.
         prompt = flatten_transcript(messages)
         with tempfile.TemporaryDirectory(prefix="gt-claude-") as work:
             sys_file = Path(work) / "system.txt"
@@ -263,7 +316,7 @@ def make_backend(name: str) -> Backend:
     if name == "api":
         if not config.ANTHROPIC_API_KEY:
             raise LLMError("LLM_BACKEND=api needs ANTHROPIC_API_KEY.")
-        return ApiBackend(config.ANTHROPIC_API_KEY)
+        return ApiBackend(config.ANTHROPIC_API_KEY, config.ANTHROPIC_WORKSPACE_ID)
     if name == "claude_cli":
         return ClaudeCliBackend(resolve_cli(config.CLAUDE_CLI_PATH), config.CLAUDE_CLI_TIMEOUT)
     raise LLMError(f"LLM_BACKEND must be one of {BACKENDS}, got {name!r}")

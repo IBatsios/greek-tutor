@@ -64,14 +64,13 @@ prefers an `ANTHROPIC_API_KEY` over your subscription whenever it sees one.
 | 1.1 | `cd C:\Users\ibats\Documents\Projects\greek-tutor` | Every command runs from the repo root |
 | 1.2 | `git switch feature/llm-backends` (until it is merged) | The subscription option and this runbook live here |
 | 1.3 | `Copy-Item .env.example .env` | Your settings; `.env` is git-ignored |
-| 1.4 | Generate two secrets (below) and put them in `.env` | Database password and cookie secret |
+| 1.4 | Generate a secret (below) and put it in `.env` | Database password |
 | 1.5 | Set `APP_TIMEZONE=America/New_York` in `.env` | So "today" matches your evenings (quota, SRS, cycle) |
 | 1.6 | Check port 8080 is free (below) | Otherwise set `APP_PORT` to something else |
 
 ```powershell
-# 1.4 — URL-safe random secrets (paste into POSTGRES_PASSWORD and COOKIE_SECRET)
+# 1.4 — URL-safe random secret (paste into POSTGRES_PASSWORD)
 -join ((1..24) | % { '{0:x2}' -f (Get-Random -Max 256) })
--join ((1..32) | % { '{0:x2}' -f (Get-Random -Max 256) })
 
 # 1.6 — is 8080 in use, or inside a range Windows reserves for Hyper-V/WSL?
 Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue

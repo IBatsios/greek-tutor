@@ -193,6 +193,7 @@ tracker-owned routine cell reads 0 no matter what you tick.
 | D7 | `require_user` returns 303 to API callers | `fetch().json()` fails on expired sessions | ✅ fixed 2026-10-18 (stage 01): `/api/*` gets 401 JSON, pages keep the redirect |
 | D8 | Session never "exercises" a vocab-cell focus when the model ignores the focus block | Focus is a prompt hint, not enforced | 02 (measure) / 13 (evals) |
 | D10 | The tutor writes Markdown (bold, tables); the practice page shows it as raw text (`white-space: pre-wrap`) | `**καφές**` and `|---|` tables on screen; readable but noisy | 05 |
+| D11 | A refused or truncated reply (`check_stop_reason` raises) was billed but is not written to `usage_ledger` | Tokens and minutes under-counted on failed turns | 02 |
 
 ## 5. First real run (2026-10-18, stage 01)
 

@@ -16,7 +16,8 @@ if not _app_log.handlers:
     _handler = logging.StreamHandler()
     _handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
     _app_log.addHandler(_handler)
-_app_log.setLevel(config.LOG_LEVEL)
+_app_log.setLevel(config.LOG_LEVEL if config.LOG_LEVEL in logging.getLevelNamesMapping()
+                  else logging.INFO)  # a typo in LOG_LEVEL must not stop the app
 
 
 @asynccontextmanager

@@ -53,20 +53,37 @@ async def test_start_turn_close_round_trip(auth_client, fake_claude):
 
 async def test_context_block_is_frozen_for_the_session_so_the_prompt_stays_cacheable(
         auth_client, fake_claude):
+    # A word due today: it is in the context block when the session starts. Answering it
+    # correctly moves its due date to tomorrow, so a rebuilt block would drop it.
+    p = db.pool()
     word = f"λέξη-{secrets.token_hex(3)}"
-    fake_claude.vocab_events = [{"greek": word, "english": "word", "result": "introduced"}]
-    sid = await _start(auth_client)
+    vocab_id = await p.fetchval(
+        "INSERT INTO vocab_items (greek, english) VALUES ($1, 'word') RETURNING id", word)
     try:
+        await p.execute("INSERT INTO user_vocab (user_id, vocab_id) VALUES ($1, $2)",
+                        auth_client.user_id, vocab_id)
+        fake_claude.vocab_events = [{"greek": word, "english": "word", "result": "correct"}]
+        sid = await _start(auth_client)
         for msg in ("Γεια!", "Καλά, εσύ;"):
             r = await auth_client.post(f"/api/session/{sid}/turn", data={"message": msg})
             assert r.status_code == 200, r.text
+        assert not await p.fetchval(
+            "SELECT srs_due_date <= CURRENT_DATE FROM user_vocab WHERE user_id=$1 AND vocab_id=$2",
+            auth_client.user_id, vocab_id)  # no longer due: a rebuild would differ
     finally:
-        await db.pool().execute("DELETE FROM vocab_items WHERE greek=$1", word)
-    # The first turn added a word to the learner's SRS; the second turn's prompt must
-    # still be byte-identical ahead of the conversation.
-    assert len(fake_claude.contexts) == 2
+        await p.execute("DELETE FROM vocab_items WHERE id=$1", vocab_id)
+    assert word in fake_claude.contexts[0]
     assert fake_claude.contexts[0] == fake_claude.contexts[1]
     assert fake_claude.transcripts[1][-1] == {"role": "user", "content": "Καλά, εσύ;"}
+
+
+async def test_a_session_started_before_migration_004_rebuilds_its_context(
+        auth_client, fake_claude):
+    sid = await _start(auth_client)
+    await db.pool().execute("UPDATE tutor_sessions SET context_block=NULL WHERE id=$1", sid)
+    r = await auth_client.post(f"/api/session/{sid}/turn", data={"message": "Γεια!"})
+    assert r.status_code == 200, r.text
+    assert fake_claude.contexts[0].startswith("STUDENT CONTEXT")
 
 
 @pytest.mark.parametrize("method,path", [

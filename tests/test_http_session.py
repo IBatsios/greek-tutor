@@ -3,8 +3,10 @@
 Skipped unless TEST_DATABASE_URL is set. Fixtures (auth_client, anon_client,
 fake_claude) live in conftest.py.
 """
+import json
 import os
 import secrets
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +15,10 @@ pytestmark = pytest.mark.skipif(
 )
 
 from app import config, db  # noqa: E402  (after the skip guard; conftest sets env)
+
+_TRANSCRIPTS = Path(__file__).parent / "fixtures" / "transcripts"
+_FIXTURE = _TRANSCRIPTS / "2026-10-18-a1-alphabet-sonnet-5-5.json"
+FIRST_REAL_RUN = json.loads(_FIXTURE.read_text(encoding="utf-8"))
 
 GOAL = {"goal_text": "Hold a 10-minute conversation in Greek", "cycle_text": "90 days"}
 
@@ -27,10 +33,11 @@ async def test_start_turn_close_round_trip(auth_client, fake_claude):
     assert (await auth_client.post("/api/harada/goal", data=GOAL)).status_code == 200
     sid = await _start(auth_client)
 
+    first = next(m for m in FIRST_REAL_RUN["messages"] if m["role"] == "assistant")
     r = await auth_client.post(f"/api/session/{sid}/turn", data={"message": "Γεια σου!"})
     assert r.status_code == 200, r.text
-    assert r.json()["reply"].startswith("Γεια σου!") and "```json" not in r.json()["reply"]
-    assert r.json()["objective_progress"] == 0.1
+    assert r.json()["reply"] == first["content"]          # JSON block stripped, prose intact
+    assert r.json()["objective_progress"] == first["meta"]["objective_progress"]
 
     r = await auth_client.post(f"/api/session/{sid}/close")
     assert r.status_code == 200 and r.json()["summary"] == fake_claude.evaluation["summary"]

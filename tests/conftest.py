@@ -5,9 +5,11 @@ required variables are filled in here before any test imports the app.
 Set TEST_DATABASE_URL to a Postgres with every migration and both seeds
 applied to run the database-backed tests; without it they are skipped.
 """
+import json
 import os
 import secrets
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 
@@ -57,11 +59,15 @@ async def auth_client(anon_client):
         await db.pool().execute("DELETE FROM users WHERE email=$1", email)
 
 
-# A tutor reply in the contract's shape: prose, then the JSON block parse_reply strips.
+TRANSCRIPTS = Path(__file__).parent / "fixtures" / "transcripts"
+FIRST_REAL_RUN = json.loads(
+    (TRANSCRIPTS / "2026-10-18-a1-alphabet-sonnet-5-5.json").read_text(encoding="utf-8"))
+_FIRST_TUTOR_TURN = next(m for m in FIRST_REAL_RUN["messages"] if m["role"] == "assistant")
+# The first reply Sonnet 5.5 gave on the stage-01 run, rebuilt in its raw shape:
+# prose, then the JSON block parse_reply strips.
 CANNED_TUTOR_REPLY = (
-    "Γεια σου! (Hello!) Ας ξεκινήσουμε με το αλφάβητο. Διάβασε αυτή τη λέξη: **καφές**.\n\n"
-    '```json\n{"vocab_events": [], "error_tags": [], "objective_progress": 0.1, '
-    '"level_signal": "at"}\n```'
+    f"{_FIRST_TUTOR_TURN['content']}\n\n"
+    f"```json\n{json.dumps(_FIRST_TUTOR_TURN['meta'], ensure_ascii=False)}\n```"
 )
 CANNED_EVALUATION = {"summary": "Practised greetings and letters.", "error_patterns": [],
                      "lesson_score": 0.5, "level_recommendation": "keep"}
